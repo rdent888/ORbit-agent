@@ -1,0 +1,52 @@
+feature,area,priority,original,clone,notes
+Multi-model selector (Gemini / Claude / GPT / Custom),Model,must,yes,no,Switch model from status bar or chat dropdown
+BYOK API key per provider (Anthropic / OpenAI / Google / Custom),Model,must,yes,no,User adds own API keys; no subscription needed
+Multi-account quota pooling (N accounts auto-rotate),Model,must,partial,no,Rotate to next account when current is rate-limited
+Live token / quota gauge per account,Model,must,yes,no,Show usage bar + reset countdown per account
+Model-swap session resume (continue on new model without losing context),Session,must,yes,no,Serialize context + replay on new model
+Session auto-save (persist to disk),Session,must,yes,no,Save every message + artifact to local SQLite
+Resume interrupted session on startup,Session,must,yes,no,Startup dialog shows resumable sessions
+/rewind checkpoint (fork conversation state),Session,should,yes,no,Create named checkpoints; fork into new branch
+Context compaction (auto-compact near context limit),Session,must,yes,no,Compress history at ~80% context limit
+/compact slash command (manual compact),Session,should,yes,no,User triggers compaction manually
+Turbo Mode toggle (full device access),Permissions,must,yes,no,Grants unrestricted FS + terminal; no sandbox
+Unrestricted terminal (no sandbox in Turbo),Permissions,must,yes,no,Commands run natively on host OS
+Full filesystem read/write (Turbo),Permissions,must,yes,no,Agent can read/write anywhere on disk
+Custom allow/deny/ask permission rules,Permissions,must,yes,no,Glob-scoped rules override Turbo defaults
+Permissions settings UI,Permissions,must,yes,no,Visual rule editor
+Agent chat panel,Chat,must,yes,no,Streaming AI responses with artifacts
+Artifact cards (plan / diff / screenshot),Chat,must,yes,no,Structured output cards with approve/reject
+Slash command palette,Chat,must,yes,no,/ to trigger commands; plugin-contributed
+Inline diff viewer (approve / reject),Chat,must,yes,no,Show file diffs inline in chat
+Agent thinking indicator / spinner,Chat,must,yes,no,Visual feedback while agent works
+Code editor (Monaco),Editor,must,yes,no,Full code editor with syntax highlighting
+File tree panel,Editor,must,yes,no,Project file explorer
+Git status in file tree,Editor,should,yes,no,Show modified / staged / untracked files
+Terminal panel (integrated),Editor,must,yes,no,Embedded terminal; Turbo mode aware
+Multi-tab editor,Editor,should,yes,no,Multiple files open simultaneously
+Minimap,Editor,could,yes,no,Code minimap in editor
+Account manager (add / remove / reorder),Accounts,must,yes,no,Manage N provider accounts
+Provider-level API key storage (encrypted),Accounts,must,yes,no,Keys stored in OS keychain or AES-encrypted local store
+Account priority ordering,Accounts,must,no,no,Define which account is tried first / fallback order
+Account health / rate-limit status,Accounts,must,yes,no,Visual indicator when account is rate-limited or errored
+Agent Manager (list running agents),Agents,should,yes,no,Panel showing all active agent sessions
+Swarm (parallel agents),Agents,could,yes,no,v2 feature; spin up N workers on shared task
+Swarm dashboard / message board,Agents,could,yes,no,v2; coordinator + worker view
+MCP server support (stdio + HTTPS),Plugins,must,yes,no,Connect MCP servers for tools
+Plugin install / enable / disable,Plugins,should,yes,no,Plugin manager UI
+Plugin marketplace (open registry),Plugins,could,no,no,v2; community plugin registry
+Skill system (SKILL.md loaded on demand),Plugins,should,yes,no,Lazy-load skill instructions
+Subagent definitions,Plugins,could,yes,no,v2; named specialized agents
+Settings UI (global + workspace),Config,must,yes,no,Tabbed settings panel with JSON fallback
+Workspace config (.agy/config.json or similar),Config,must,yes,no,Per-project overrides
+Rules file (AGENTS.md / coding conventions),Config,should,yes,no,Persistent coding rules injected into every session
+Hooks (pre/post tool call shell commands),Config,could,yes,no,v2; lifecycle hooks
+Onboarding / first-run wizard,Onboarding,must,yes,no,Guide user through account + model setup
+Voice mode,Input,could,yes,no,v2; speech-to-text input
+Browser testing integration,Testing,could,yes,no,v2; Playwright / headless browser in agent
+Screenshot artifact,Testing,could,yes,no,v2; agent captures browser screenshot
+agy CLI (--continue / --conversation flags),CLI,should,yes,no,Terminal interface with session resume flags
+CLI model flag (--model),CLI,should,yes,no,Select model from CLI
+Credential masking in terminal output,Security,must,yes,no,Hide API keys in terminal logs
+Secure API key storage (OS keychain),Security,must,yes,no,Never store keys in plaintext
+Git integration (commit / push),Git,could,yes,no,v2; agent-driven git operations
