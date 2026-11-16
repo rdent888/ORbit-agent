@@ -1,0 +1,14 @@
+{
+  "app_store": {
+    "name": "OmniCode AI Studio",
+    "subtitle": "Multi-Model AI Code Editor",
+    "promotional_text": "Autonomous coding with BYOK multi-account pooling and Turbo local device access.",
+    "keywords": "code,editor,developer,ai,terminal,programming,ide,agent,typescript,git",
+    "description": "OmniCode AI is an advanced agentic development environment built for developers who demand complete control over their AI coding workflows. Connect multiple API keys from Google, Anthropic, and OpenAI into a unified quota pool with automatic 429 rate-limit failover. Work at full speed with Turbo Mode local device access."
+  },
+  "google_play": {
+    "title": "OmniCode AI Studio",
+    "short_description": "Agentic coding environment with BYOK multi-account pooling & Turbo Mode.",
+    "full_description": "OmniCode AI transforms software development with autonomous agentic workflows. Manage multiple AI provider accounts seamlessly, execute local terminal tasks unsandboxed in Turbo Mode, and resume interrupted tasks without context loss."
+  }
+}
