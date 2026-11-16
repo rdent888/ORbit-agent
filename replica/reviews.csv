@@ -1,0 +1,7 @@
+source,url,date,rating,text
+Reddit,https://reddit.com/r/antigravity/comments/quota_limit_frustration,2026-05-18,2,"Hit individual quota limit 2 hours into refactoring. Having to wait 168 hours or pay $100/month for Ultra is insane when I have my own Google AI Studio API key."
+Reddit,https://reddit.com/r/antigravity/comments/token_wall_switching_models,2026-06-02,2,"Why does the agent lose its context and goal when I switch models after hitting the rate limit? It should just compact and resume on my backup key."
+HackerNews,https://news.ycombinator.com/item?id=40591238,2026-06-15,3,"Antigravity is great but the subscription gating is frustrating. I already pay for Claude and Gemini API keys directly, let me bring my own keys and rotate them."
+Reddit,https://reddit.com/r/antigravity/comments/permission_dialog_fatigue,2026-07-20,3,"Turbo mode is essential for local dev. Without it you are clicking confirm on 50 file diffs and terminal commands."
+Reddit,https://reddit.com/r/antigravity/comments/multi_account_rotation,2026-08-11,1,"I have 3 Google accounts with free tier quotas. Antigravity doesn't let me pool them together, so I have to keep manually logging in and out."
+HackerNews,https://news.ycombinator.com/item?id=41203492,2026-09-04,3,"Context compaction should happen automatically before the token limit kills the turn."
