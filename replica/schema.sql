@@ -1,186 +1,244 @@
--- ============================================================
--- Antigravity IDE Clone — SQLite Schema (v2 — FINAL)
--- File: replica/schema.sql
--- ============================================================
--- Base: VS Code fork (microsoft/vscode open source) + Electron.
--- SQLite dialect. All timestamps stored as ISO-8601 text UTC.
--- Two storage layers:
---   1. LevelDB  — VS Code built-in; KV cache for token state,
---                 file index, quick metadata (via VS Code API).
---   2. SQLite   — this file; relational; sessions, messages,
---                 artifacts, checkpoints, accounts, plugins.
---                 Stored at: globalStorageUri/db.sqlite
---                 (compiled with electron-rebuild for VS Code ABI)
--- Sensitive fields: api_key_ref / auth_vars_ref store a keychain
--- reference key (keytar), NEVER the raw secret.
--- ============================================================
+-- AGY Local — SQLite Schema
+-- Generated: 2026-11-17
 
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
+PRAGMA journal_mode=WAL;
+PRAGMA foreign_keys=ON;
 
--- ------------------------------------------------------------
--- models  (seeded at startup, user can add custom)
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS models (
-  id              TEXT PRIMARY KEY,          -- e.g. "anthropic/claude-sonnet-4-5"
-  provider        TEXT NOT NULL,             -- google | anthropic | openai | custom
-  name            TEXT NOT NULL,             -- claude-sonnet-4-5
-  display_name    TEXT NOT NULL,             -- Claude Sonnet 4.5
-  context_window  INTEGER NOT NULL DEFAULT 200000,
-  supports_thinking INTEGER NOT NULL DEFAULT 0, -- bool 0/1
-  cost_per_1k_input  REAL NOT NULL DEFAULT 0,
-  cost_per_1k_output REAL NOT NULL DEFAULT 0,
-  is_byok         INTEGER NOT NULL DEFAULT 1,
+-- ============================================================
+-- PROJECTS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS projects (
+  id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  name        TEXT NOT NULL,
+  path        TEXT NOT NULL,
+  settings    TEXT NOT NULL DEFAULT '{}',
+  is_active   INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_projects_active ON projects(is_active);
+
+-- ============================================================
+-- MODEL ACCOUNTS  [FITUR UNIK]
+-- ============================================================
+CREATE TABLE IF NOT EXISTS model_accounts (
+  id                  TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  provider            TEXT NOT NULL
+    CHECK (provider IN ('gemini','claude','openai','openrouter','ollama','custom')),
+  account_label       TEXT NOT NULL,
+  api_key_encrypted   TEXT NOT NULL,
+  base_url            TEXT,
+  is_active           INTEGER NOT NULL DEFAULT 1,
+  priority            INTEGER NOT NULL DEFAULT 0,
+  token_limit_per_day INTEGER NOT NULL DEFAULT 0,
+  tokens_used_today   INTEGER NOT NULL DEFAULT 0,
+  last_used_at        TEXT,
+  last_reset_at       TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_model_accounts_provider
+  ON model_accounts(provider, is_active, priority);
+
+-- ============================================================
+-- MODEL CONFIGS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS model_configs (
+  id              TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  display_name    TEXT NOT NULL,
+  provider        TEXT NOT NULL,
+  model_id        TEXT NOT NULL,
+  context_window  INTEGER NOT NULL DEFAULT 128000,
   is_enabled      INTEGER NOT NULL DEFAULT 1,
-  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+  sort_order      INTEGER NOT NULL DEFAULT 0,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- ------------------------------------------------------------
--- accounts  (BYOK — one row per API key / provider account)
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS accounts (
+-- Default models
+INSERT OR IGNORE INTO model_configs (id, display_name, provider, model_id, context_window, sort_order) VALUES
+  ('mc-gemini-flash',  'Gemini 3.8 Flash',       'gemini',   'gemini/gemini-3.8-flash',           1000000, 0),
+  ('mc-gemini-25-flash','Gemini 2.5 Flash',      'gemini',   'gemini/gemini-2.5-flash',           1000000, 1),
+  ('mc-gemini-pro',    'Gemini 2.5 Pro',          'gemini',   'gemini/gemini-2.5-pro',             1000000, 2),
+  ('mc-claude-sonnet', 'Claude Sonnet 4.5',       'claude',   'anthropic/claude-sonnet-4-5',       200000,  3),
+  ('mc-claude-opus',   'Claude Opus 4',           'claude',   'anthropic/claude-opus-4',           200000,  4),
+  ('mc-gpt4o',         'GPT-4o',                  'openai',   'openai/gpt-4o',                     128000,  5),
+  ('mc-gpt4o-mini',    'GPT-4o Mini',             'openai',   'openai/gpt-4o-mini',                128000,  6),
+  ('mc-deepseek',      'DeepSeek R1',             'openrouter','openrouter/deepseek/deepseek-r1',  64000,   7);
+
+-- ============================================================
+-- CONVERSATIONS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS conversations (
   id              TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-  provider        TEXT NOT NULL,             -- google | anthropic | openai | custom
-  label           TEXT NOT NULL,             -- user-chosen, e.g. "Work Claude"
-  api_key_ref     TEXT NOT NULL,             -- keychain reference key, NOT the raw key
-  base_url        TEXT,                      -- NULL = use provider default
-  priority_order  INTEGER NOT NULL DEFAULT 0,-- lower = tried first
-  quota_used      INTEGER NOT NULL DEFAULT 0,-- tokens used this window
-  quota_limit     INTEGER NOT NULL DEFAULT 0,-- 0 = unknown / unlimited
-  quota_reset_at  TEXT,                      -- ISO-8601 or NULL
-  status          TEXT NOT NULL DEFAULT 'ok'
-                  CHECK (status IN ('ok','rate_limited','error','disabled')),
-  is_active       INTEGER NOT NULL DEFAULT 1,
-  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
-);
-CREATE INDEX IF NOT EXISTS idx_accounts_priority ON accounts(priority_order, status);
-
--- ------------------------------------------------------------
--- account_model_support  (which accounts support which models)
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS account_model_support (
-  account_id  TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  model_id    TEXT NOT NULL REFERENCES models(id) ON DELETE CASCADE,
-  PRIMARY KEY (account_id, model_id)
-);
-
--- ------------------------------------------------------------
--- workspaces  (one per local project folder)
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS workspaces (
-  id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-  name          TEXT NOT NULL,
-  path          TEXT NOT NULL UNIQUE,        -- absolute local path
-  turbo_mode    INTEGER NOT NULL DEFAULT 0,
-  config        TEXT NOT NULL DEFAULT '{}',  -- JSON blob
-  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
-);
-
--- ------------------------------------------------------------
--- permission_rules  (allow / deny / ask per workspace + tool)
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS permission_rules (
-  id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-  workspace_id  TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  tool_name     TEXT NOT NULL,               -- e.g. "fs.write" or "*"
-  pattern       TEXT NOT NULL DEFAULT '*',   -- glob, e.g. "/home/user/secrets/**"
-  action        TEXT NOT NULL DEFAULT 'ask'
-                CHECK (action IN ('allow','deny','ask')),
-  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
-);
-CREATE INDEX IF NOT EXISTS idx_perm_workspace ON permission_rules(workspace_id, tool_name);
-
--- ------------------------------------------------------------
--- sessions  (one conversation / task)
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS sessions (
-  id              TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-  workspace_id    TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  parent_id       TEXT REFERENCES sessions(id) ON DELETE SET NULL, -- fork parent
-  title           TEXT NOT NULL DEFAULT 'New Session',
-  goal_text       TEXT,
-  model_id        TEXT REFERENCES models(id) ON DELETE SET NULL,
-  account_id      TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+  project_id      TEXT REFERENCES projects(id) ON DELETE SET NULL,
+  title           TEXT NOT NULL DEFAULT 'New Conversation',
+  model_config_id TEXT REFERENCES model_configs(id) ON DELETE SET NULL,
+  goal            TEXT,
   status          TEXT NOT NULL DEFAULT 'active'
-                  CHECK (status IN ('active','paused','completed','token_limit','compacting')),
+    CHECK (status IN ('active','completed','error','checkpoint_available')),
   token_count     INTEGER NOT NULL DEFAULT 0,
-  compact_summary TEXT,                      -- compacted context summary text
-  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-  last_active_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX IF NOT EXISTS idx_sessions_workspace ON sessions(workspace_id, last_active_at DESC);
-CREATE INDEX IF NOT EXISTS idx_sessions_status    ON sessions(status);
+CREATE INDEX IF NOT EXISTS idx_conversations_project
+  ON conversations(project_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_conversations_status
+  ON conversations(status);
 
--- ------------------------------------------------------------
--- messages  (each turn in a session)
--- ------------------------------------------------------------
+-- ============================================================
+-- MESSAGES
+-- ============================================================
 CREATE TABLE IF NOT EXISTS messages (
-  id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-  session_id    TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  role          TEXT NOT NULL CHECK (role IN ('user','assistant','tool','system')),
-  content       TEXT NOT NULL,
-  model_id      TEXT REFERENCES models(id) ON DELETE SET NULL,
-  account_id    TEXT REFERENCES accounts(id) ON DELETE SET NULL,
-  tokens_used   INTEGER NOT NULL DEFAULT 0,
-  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+  id                TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  conversation_id   TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  role              TEXT NOT NULL
+    CHECK (role IN ('user','assistant','tool','system')),
+  content           TEXT NOT NULL,
+  model_account_id  TEXT REFERENCES model_accounts(id) ON DELETE SET NULL,
+  model_id          TEXT,
+  token_count       INTEGER NOT NULL DEFAULT 0,
+  sequence_index    INTEGER NOT NULL,
+  created_at        TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation
+  ON messages(conversation_id, sequence_index);
 
--- ------------------------------------------------------------
--- artifacts  (agent-produced structured outputs)
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS artifacts (
-  id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-  session_id    TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  message_id    TEXT REFERENCES messages(id) ON DELETE SET NULL,
-  type          TEXT NOT NULL DEFAULT 'generic'
-                CHECK (type IN ('plan','diff','screenshot','terminal','generic')),
-  content       TEXT NOT NULL,               -- JSON or markdown
-  status        TEXT NOT NULL DEFAULT 'pending'
-                CHECK (status IN ('pending','approved','rejected')),
-  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
-);
-CREATE INDEX IF NOT EXISTS idx_artifacts_session ON artifacts(session_id, type);
-
--- ------------------------------------------------------------
--- checkpoints  (rewind / fork points within a session)
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS checkpoints (
-  id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-  session_id    TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  label         TEXT NOT NULL DEFAULT 'checkpoint',
-  message_id    TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-  token_count   INTEGER NOT NULL DEFAULT 0,
-  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
-);
-CREATE INDEX IF NOT EXISTS idx_checkpoints_session ON checkpoints(session_id, created_at);
-
--- ------------------------------------------------------------
--- plugins  (MCP servers, skills, subagents)
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS plugins (
-  id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-  name          TEXT NOT NULL UNIQUE,
-  source_url    TEXT,
-  type          TEXT NOT NULL DEFAULT 'mcp'
-                CHECK (type IN ('mcp','skill','agent')),
-  config        TEXT NOT NULL DEFAULT '{}',  -- JSON
-  auth_vars_ref TEXT,                        -- keychain reference for secrets
-  is_enabled    INTEGER NOT NULL DEFAULT 1,
-  installed_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
-);
-
--- ------------------------------------------------------------
--- slash_commands  (built-in + plugin-contributed)
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS slash_commands (
+-- ============================================================
+-- TOOL CALLS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS tool_calls (
   id              TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-  name            TEXT NOT NULL UNIQUE,       -- e.g. "compact"
-  description     TEXT NOT NULL DEFAULT '',
-  plugin_id       TEXT REFERENCES plugins(id) ON DELETE CASCADE, -- NULL = built-in
-  handler_type    TEXT NOT NULL DEFAULT 'builtin'
-                  CHECK (handler_type IN ('builtin','skill','mcp')),
-  keyboard_shortcut TEXT
+  message_id      TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  tool_name       TEXT NOT NULL,
+  arguments       TEXT NOT NULL DEFAULT '{}',
+  result          TEXT,
+  status          TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending','approved','denied','running','done','error')),
+  approved_by_user INTEGER NOT NULL DEFAULT 0,
+  error_message   TEXT,
+  started_at      TEXT,
+  completed_at    TEXT,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_tool_calls_message ON tool_calls(message_id);
+CREATE INDEX IF NOT EXISTS idx_tool_calls_status  ON tool_calls(status);
+
+-- ============================================================
+-- ARTIFACTS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS artifacts (
+  id              TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  type            TEXT NOT NULL
+    CHECK (type IN ('plan','report','code','generative-ui','file-list','markdown')),
+  title           TEXT NOT NULL DEFAULT 'Artifact',
+  content         TEXT NOT NULL,
+  version         INTEGER NOT NULL DEFAULT 1,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_artifacts_conversation ON artifacts(conversation_id);
+
+-- ============================================================
+-- CHECKPOINTS  [FITUR UNIK]
+-- ============================================================
+CREATE TABLE IF NOT EXISTS checkpoints (
+  id                  TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  conversation_id     TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  message_index       INTEGER NOT NULL,
+  goal_snapshot       TEXT NOT NULL,
+  progress_summary    TEXT NOT NULL,
+  context_snapshot    TEXT NOT NULL,
+  pending_tool_calls  TEXT NOT NULL DEFAULT '[]',
+  model_id_at_stop    TEXT,
+  stop_reason         TEXT NOT NULL DEFAULT 'token_limit'
+    CHECK (stop_reason IN ('token_limit','rate_limit','error','user_pause','model_switch')),
+  is_resumed          INTEGER NOT NULL DEFAULT 0,
+  resumed_at          TEXT,
+  created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_checkpoints_conversation
+  ON checkpoints(conversation_id, is_resumed);
+
+-- ============================================================
+-- SETTINGS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS settings (
+  key         TEXT PRIMARY KEY,
+  value       TEXT NOT NULL,
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+INSERT OR IGNORE INTO settings (key, value) VALUES
+  ('tool_execution_policy',        '"request-review"'),
+  ('turbo_mode',                   'false'),
+  ('nonworkspace_file_access',     '"ask"'),
+  ('internet_access',              '"allow"'),
+  ('theme',                        '"dark"'),
+  ('default_model_config_id',      'null'),
+  ('command_allowlist',            '[]'),
+  ('command_denylist',             '[]'),
+  ('keep_awake',                   'false'),
+  ('context_compaction_threshold', '0.8'),
+  ('auto_checkpoint',              'true'),
+  ('checkpoint_threshold',         '0.75');
+
+-- ============================================================
+-- PERMISSION RULES
+-- ============================================================
+CREATE TABLE IF NOT EXISTS permission_rules (
+  id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  scope       TEXT NOT NULL CHECK (scope IN ('global','project')),
+  project_id  TEXT REFERENCES projects(id) ON DELETE CASCADE,
+  type        TEXT NOT NULL CHECK (type IN ('command','file','url')),
+  pattern     TEXT NOT NULL,
+  action      TEXT NOT NULL CHECK (action IN ('allow','deny')),
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ============================================================
+-- SCHEDULED TASKS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS scheduled_tasks (
+  id                    TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  project_id            TEXT REFERENCES projects(id) ON DELETE SET NULL,
+  name                  TEXT NOT NULL,
+  cron_expression       TEXT,
+  delay_seconds         INTEGER,
+  conversation_template TEXT NOT NULL DEFAULT '{}',
+  status                TEXT NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active','paused','failed')),
+  last_run_at           TEXT,
+  next_run_at           TEXT,
+  last_error            TEXT,
+  created_at            TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ============================================================
+-- SKILLS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS skills (
+  id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  name        TEXT NOT NULL,
+  source      TEXT NOT NULL CHECK (source IN ('builtin','local')),
+  folder_path TEXT,
+  enabled     INTEGER NOT NULL DEFAULT 1,
+  config      TEXT NOT NULL DEFAULT '{}',
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ============================================================
+-- SUBAGENTS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS subagents (
+  id                TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  parent_conv_id    TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  name              TEXT NOT NULL,
+  model_config_id   TEXT REFERENCES model_configs(id),
+  status            TEXT NOT NULL DEFAULT 'running'
+    CHECK (status IN ('running','done','error','killed')),
+  brief             TEXT NOT NULL,
+  result            TEXT,
+  started_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  completed_at      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_subagents_parent ON subagents(parent_conv_id, status);

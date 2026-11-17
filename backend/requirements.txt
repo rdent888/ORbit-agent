@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+litellm
+cryptography
+python-dotenv
+websockets
+aiofiles
+tiktoken
+httpx
+pydantic

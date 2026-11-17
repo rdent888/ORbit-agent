@@ -1,52 +1,49 @@
 feature,area,priority,original,clone,notes
-Multi-model selector (Gemini / Claude / GPT / Custom),Model,must,yes,yes,Switches active model on the fly from status bar dropdown
-BYOK API key per provider (Anthropic / OpenAI / Google / Custom),Model,must,yes,yes,User adds own API keys and base URLs without Antigravity subscription
-Multi-account quota pooling (N accounts auto-rotate),Model,must,partial,yes,Priority queue auto-failover when rate limit 429 occurs
-Live token / quota gauge per account,Model,must,yes,yes,Real-time token usage progress bar and reset status
-Model-swap session resume (continue on new model without losing context),Session,must,yes,yes,Context preserved and goal retained when switching models
-Session auto-save (persist to disk),Session,must,yes,yes,State managed in Zustand and structured SQLite contracts
-Resume interrupted session on startup,Session,must,yes,yes,ResumeSessionDialog allows instant continuation of interrupted tasks
-/rewind checkpoint (fork conversation state),Session,should,yes,partial,Checkpoints schema supported; UI tree in next slice
-Context compaction (auto-compact near context limit),Session,must,yes,yes,Compact button & summarizer compresses historical context
-/compact slash command (manual compact),Session,should,yes,partial,Triggerable via UI action
-Turbo Mode toggle (full device access),Permissions,must,yes,yes,Unrestricted toggle with OS access indicator
-Unrestricted terminal (no sandbox in Turbo),Permissions,must,yes,yes,Integrated terminal with Turbo execution mode
-Full filesystem read/write (Turbo),Permissions,must,yes,yes,Direct file modifications applied across workspace
-Custom allow/deny/ask permission rules,Permissions,must,yes,yes,Safety overlay with tool & glob pattern filters
-Permissions settings UI,Permissions,must,yes,yes,Visual rule editor in SettingsPanel
-Agent chat panel,Chat,must,yes,yes,Streaming agent messages, status indicators, and artifacts
-Artifact cards (plan / diff / screenshot),Chat,must,yes,yes,Interactive cards for Plans, Diffs, and Terminal logs with approve/reject
-Slash command palette,Chat,must,yes,partial,Autocomplete command palette in chat input
-Inline diff viewer (approve / reject),Chat,must,yes,yes,Diff preview with direct file patch application
-Agent thinking indicator / spinner,Chat,must,yes,yes,StatusDot with pulsating indicator during agent reasoning
-Code editor (Monaco),Editor,must,yes,yes,Full Monaco Editor integration with multi-language syntax highlighting
-File tree panel,Editor,must,yes,yes,File explorer panel with file opening tabs
-Git status in file tree,Editor,should,yes,partial,Git branch displayed in status bar
-Terminal panel (integrated),Editor,must,yes,yes,Integrated node-pty terminal panel with Turbo indicator
-Multi-tab editor,Editor,should,yes,yes,Multi-file tab manager with close & switch capabilities
-Minimap,Editor,could,yes,yes,Monaco minimap enabled
-Account manager (add / remove / reorder),Accounts,must,yes,yes,BYOK Multi-account manager panel with priority ordering
-Provider-level API key storage (encrypted),Accounts,must,yes,yes,Simulated secure vault / OS keychain reference
-Account priority ordering,Accounts,must,no,yes,Configurable priority order for automatic rotation
-Account health / rate-limit status,Accounts,must,yes,yes,Active, Rate Limited, and Error badges with countdowns
-Agent Manager (list running agents),Agents,should,yes,partial,Session manager showing active agent states
-Swarm (parallel agents),Agents,could,yes,no,Scheduled for v2
-Swarm dashboard / message board,Agents,could,yes,no,Scheduled for v2
-MCP server support (stdio + HTTPS),Plugins,must,yes,partial,Data model defined; client binding in next milestone
-Plugin install / enable / disable,Plugins,should,yes,no,Scheduled for Milestone 4
-Plugin marketplace (open registry),Plugins,could,no,no,Scheduled for v2
-Skill system (SKILL.md loaded on demand),Plugins,should,yes,no,Scheduled for Milestone 4
-Subagent definitions,Plugins,could,yes,no,Scheduled for v2
-Settings UI (global + workspace),Config,must,yes,yes,SettingsPanel with hardware permissions
-Workspace config (.agy/config.json or similar),Config,must,yes,yes,Workspace path and configuration binding
-Rules file (AGENTS.md / coding conventions),Config,should,yes,partial,Permission rules overlay
-Hooks (pre/post tool call shell commands),Config,could,yes,no,Scheduled for v2
-Onboarding / first-run wizard,Onboarding,must,yes,partial,Initial seed state guides new user
-Voice mode,Input,could,yes,no,Scheduled for v2
-Browser testing integration,Testing,could,yes,no,Scheduled for v2
-Screenshot artifact,Testing,could,yes,no,Scheduled for v2
-agy CLI (--continue / --conversation flags),CLI,should,yes,partial,CLI schema defined
-CLI model flag (--model),CLI,should,yes,partial,CLI schema defined
-Credential masking in terminal output,Security,must,yes,yes,Masked API keys and tokens
-Secure API key storage (OS keychain),Security,must,yes,yes,Keychain reference mapping
-Git integration (commit / push),Git,could,yes,partial,Terminal git status and diff integration
+Chat canvas dengan streaming response,Core Chat,must,yes,yes,SSE streaming dari backend
+Message history & conversation list,Core Chat,must,yes,yes,SQLite storage
+Slash commands (/),Core Chat,must,yes,yes,Popup menu with /plan /goal /terminal /checkpoint
+@ mention untuk attach konteks,Core Chat,should,yes,partial,Attach context button available
+Media upload (image/file ke chat),Core Chat,should,yes,partial,File attachment input stub
+Planning mode (review sebelum eksekusi),Core Chat,should,yes,yes,Plan slash workflow & tool approval
+Model selector dropdown,Model Management,must,yes,yes,Dropdown with Auto router + specific models
+Multi-provider support (Gemini/Claude/OpenAI),Model Management,must,yes,yes,Via LiteLLM router
+BansosAI & Custom OpenAI Proxy,Model Management,must,no,yes,FITUR UNIK — support custom Base URL & API key
+Smart Task Router (Auto Mode),Model Management,must,no,yes,FITUR UNIK — analisis tugas berat/ringan otomatis
+Auto-import models from provider,Model Management,should,no,yes,FITUR UNIK — ambil list model dari /v1/models
+Multi-akun per provider,Model Management,must,no,yes,FITUR UNIK — tambah banyak API key per provider
+Token rotation otomatis saat limit,Model Management,must,no,yes,FITUR UNIK — LiteLLM fallback + custom priority logic
+Token usage indicator per akun,Model Management,must,no,yes,FITUR UNIK — tracker usage harian
+Thinking level selector (Low/Med/High),Model Management,should,yes,yes,Budget tokens thinking for Gemini
+Integrated terminal (xterm.js),Terminal,must,yes,yes,xterm.js + WebSocket host PowerShell
+Multi-tab terminal,Terminal,should,yes,partial,Can restart and focus shell
+Shell selector (bash/powershell),Terminal,should,yes,yes,Windows PowerShell host integration
+Tool call cards (approval UI),Permissions,must,yes,yes,Approval dialog with Allow / Deny buttons
+Permission dialog (Allow/Deny),Permissions,must,yes,yes,Global request-review policy
+Always-allow / always-deny list,Permissions,should,yes,partial,Configured in settings table
+Turbo Mode (nonaktifkan sandbox),Permissions,must,yes,yes,Bypass sandbox & approvals with direct local access
+File explorer sidebar,Files,must,yes,partial,Directory list and file read/write tools
+Visual diff viewer (Files Changed),Files,must,yes,partial,Diff view stub
+Non-workspace file access control,Files,must,yes,yes,Setting allow/ask/deny & Turbo Mode bypass
+Artifact panel (plan/report/dll),Artifacts,must,yes,partial,Markdown rendering in chat and auxiliary
+Generative UI artifacts (HTML/React),Artifacts,should,yes,partial,Planned for milestone 2
+Artifact versioning,Artifacts,could,yes,no,Fase 2
+Resume progress (checkpoint),Resume,must,no,yes,FITUR UNIK — simpan checkpoint + context snapshot
+Lanjut dengan model berbeda,Resume,must,no,yes,FITUR UNIK — dropdown ganti model pada resume banner
+Goal tracking / goal-locked,Resume,must,no,yes,FITUR UNIK — persistent system goal injection
+Context compaction otomatis,Resume,should,yes,yes,Threshold auto-checkpoint at 75%
+Checkpoint banner / resume notification,Resume,must,no,yes,FITUR UNIK — visual checkpoint resume card
+Projects / workspace management,Projects,must,yes,partial,Database and backend routes ready
+Project-level settings override,Projects,should,yes,partial,Database table ready
+Subagents (basic),Subagents,should,yes,partial,Database model ready
+Subagent monitor panel,Subagents,should,yes,partial,Backend ready
+Background tasks panel,Tasks,should,yes,partial,Backend ready
+Scheduled tasks (cron),Tasks,could,yes,partial,Backend ready
+Skills / plugin system (local),Customization,should,yes,partial,Database table ready
+Rules (.md instruction files),Customization,should,yes,partial,Database table ready
+MCP server support,Customization,could,yes,no,Fase 2
+Settings UI (global),Settings,must,yes,yes,Account manager & configuration UI
+Settings UI (project level),Settings,should,yes,partial,Backend ready
+Theme (light/dark),Settings,should,yes,yes,Dark IDE theme
+Notifications (task selesai),Settings,could,yes,no,Fase 2
+Swarm / multi-agent board,Advanced,could,yes,no,Fase 2
+Marketplace plugin browser,Customization,could,yes,no,Fase 2

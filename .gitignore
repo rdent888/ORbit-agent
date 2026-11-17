@@ -1,7 +1,74 @@
-node_modules/
-dist/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 build/
-.cache/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Node & Frontend
+node_modules/
+.npm/
+.tmp/
+dist/
+dist-ssr/
+*.local
+.eslintcache
+
+# Logs & Databases
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS Files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# SQLite Databases & Local user data
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*.db-journal
+data/*.sqlite
+*.db
+*.sqlite
+
+# IDE & Local Env
 .env
 .env.local
+.env.*.local
+backend/.env
+!.env.example
+*.swp
+*.swo
+*~

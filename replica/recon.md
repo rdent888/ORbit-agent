@@ -1,225 +1,248 @@
-# Recon Map — Antigravity IDE Clone
-> Generated: 2026-11-16 | Skill: replica-recon
-
----
-
-## Scope
-
-| Field | Value |
-|---|---|
-| **App** | Google Antigravity IDE (Desktop App + IDE Extensions) |
-| **Platform** | Desktop (Windows / macOS / Linux), VS Code Extension, CLI |
-| **Slice** | Core agentic coding loop: multi-model AI, Turbo Mode, session resume, BYOK multi-account |
-| **Who it is for** | Developers who want unlimited AI coding assistant without subscription lock-in |
+# Replica Recon Map — Clone Antigravity
+**Target:** Google Antigravity (AGY) → versi Web App lokal
+**Platform:** Web App (browser, localhost) — Windows host
+**Tanggal recon:** 2026-11-17
+**Scope:** Core loop — chat agent + multi-model/multi-akun + terminal + file explorer + resume progress
+**Tujuan:** Personal tool, pakai sendiri
 
 ---
 
 ## Sources
 
-| Source | URL / Location | What it gives |
-|---|---|---|
-| Official docs | antigravity.google | Feature list, MCP config, permissions, slash commands |
-| Pricing page | antigravity.google/pricing | Tier gating, what matters |
-| Changelog | antigravity.google/changelog | Recent additions |
-| GitHub (community) | github.com/google/antigravity-* | Public API, CLI flags, config schema |
-| Community extensions | open-vsx.org, marketplace.visualstudio.com | AG Switchboard, Multi-ID Quota |
-| Reddit / HN | reddit.com/r/antigravity | Real user pain points |
-| Public walkthrough videos | youtube.com | Real flows |
-| CLI help | `agy --help` | All flags, commands |
+| Sumber | URL / Lokasi | Nilai |
+|--------|-------------|-------|
+| Antigravity app.md reference | `~/.gemini/antigravity/builtin/skills/antigravity_guide/references/app.md` | ⭐⭐⭐ |
+| Antigravity ide.md reference | `~/.gemini/antigravity/builtin/skills/antigravity_guide/references/ide.md` | ⭐⭐⭐ |
+| Antigravity cli.md reference | `~/.gemini/antigravity/builtin/skills/antigravity_guide/references/cli.md` | ⭐⭐ |
+| Public docs | `https://antigravity.google/docs` | ⭐⭐⭐ |
+| Web search hasil | Riset 2025 | ⭐⭐ |
+| Live observation | Pakai langsung (user sedang pakai app) | ⭐⭐⭐ |
 
 ---
 
 ## Screen Inventory
 
-| ID | Screen | Route / Entry | Purpose | Key Components | States |
-|---|---|---|---|---|---|
-| S01 | Welcome / Onboarding | App launch, first run | Sign-in, account setup | Sign-in button, model selector, permissions prompt | First run, returning user |
-| S02 | Main IDE Layout | After sign-in | Code editor + agent panel | Editor pane, Agent sidebar, file tree, terminal, status bar | Empty project, active session |
-| S03 | Agent Chat Panel | Sidebar / S02 | Conversation with AI agent | Chat input, message history, model badge, token counter, artifact cards | Idle, thinking, streaming, error, token-limit |
-| S04 | Model Selector | Status bar click / S03 dropdown | Switch active AI model | Model list (Gemini, Claude, GPT, custom), account label, quota badge | Available, rate-limited, BYOK |
-| S05 | Account Manager | Settings → Accounts | Add/remove/switch AI provider accounts | Account list, provider logos, API key field, quota gauge, priority order | 0 accounts, 1 account, N accounts |
-| S06 | Turbo Mode Panel | Settings → Permissions / toolbar toggle | Configure full-device access | Toggle switch, permission presets, allow/deny/ask rule list, warning banner | Off, On, Custom rules |
-| S07 | Session Resume Dialog | On startup / token-limit hit | Resume interrupted session | Session history list, model selector, "Continue from" timestamp, goal summary | No prior session, 1 session, N sessions |
-| S08 | Workspace / Project View | File tree panel | Browse and manage project files | File tree, breadcrumb, search, git status | Empty, populated, dirty |
-| S09 | Terminal Panel | Bottom panel | Run commands, see agent shell output | Terminal instance, command history, Turbo badge | Standard, Turbo (no sandbox) |
-| S10 | Artifact Viewer | Inline in chat / floating | View agent-produced plans, diffs, screenshots | Markdown render, diff viewer, image preview, approval buttons | Plan, diff, screenshot, approved |
-| S11 | Agent Manager | Sidebar view / command palette | Manage multiple parallel agents (swarm) | Agent list, status badges, spawn button, kill button, model per-agent | 0 agents, running, stalled |
-| S12 | Permissions Settings | Settings → Permissions | Fine-grained tool allow/deny rules | Rule list, glob patterns, tool checkboxes, Turbo override warning | Default, custom, locked |
-| S13 | Plugin / MCP Manager | Settings → Plugins | Add/remove MCP servers and skills | Plugin cards, install toggle, auth fields, marketplace search | No plugins, installed, auth-needed |
-| S14 | Slash Command Palette | `/` in chat input | Trigger built-in and plugin commands | Command list, search, description, keyboard shortcut | Empty query, filtered |
-| S15 | Token / Quota Dashboard | Status bar → usage panel | Monitor live token usage across accounts | Per-account gauge, model usage breakdown, reset countdown, BYOK indicator | Under limit, warning, exceeded |
-| S16 | BYOK Configuration | Settings → Models → Add Provider | Add custom API keys for any provider | Provider dropdown, API key input, base URL (optional), test button | Unconfigured, testing, valid, invalid |
-| S17 | Context Compaction Banner | Inline in chat (auto) | Alert when context is near limit and auto-compact | Warning bar, manual compact button, /compact hint | Near-limit, compacting, done |
-| S18 | Fork / Rewind Panel | Command palette / chat `/rewind` | Branch conversation state to safe point | Session tree, checkpoint list, fork button | 1 checkpoint, N checkpoints |
-| S19 | Swarm Dashboard | Agent Manager → Swarm tab | Orchestrate parallel agent workers | Worker cards, shared message board, coordinator controls, model per-worker | Idle swarm, active, stalled |
-| S20 | Settings / Configuration | Settings icon | Global and workspace config | Tabbed settings, JSON editor, schema validation | Default, customized |
+| ID | Screen | Route / Cara buka | Tujuan | Komponen utama | States |
+|----|--------|-------------------|--------|---------------|--------|
+| S01 | **New Conversation / Home** | Default saat buka app | Mulai chat baru dengan agent | Input box, slash command hint, model selector | Empty, typing |
+| S02 | **Chat Canvas** | Saat user kirim pesan | Interaksi utama dengan agent | Message bubbles, tool call cards, artifact cards, progress indicator | Loading, streaming, done, error, waiting-approval |
+| S03 | **Left Sidebar — Conversation List** | Selalu terlihat | Navigasi antar sesi chat | List conversation, search, new chat button | Empty, populated, hovered |
+| S04 | **Left Sidebar — Projects** | Klik "Projects" di sidebar | Kelola workspace/repo | Project list, add project, active indicator | Empty, active project |
+| S05 | **Left Sidebar — Scheduled Tasks** | Klik "Scheduled Tasks" | Kelola task terjadwal | Task list, cron editor, timer, status badge | Empty, running, paused |
+| S06 | **Left Sidebar — Skills & Customizations** | Klik "Skills" | Lihat & kelola skills/plugins/rules | Skills list, toggle, install from marketplace | Empty, installed list |
+| S07 | **Settings — Global** | Klik Settings icon | Konfigurasi global app | Model selector, permission toggles, theme, sandbox toggle | Default, modified |
+| S08 | **Settings — Project Level** | Settings dalam konteks project aktif | Override setting per project | File access policy, internet policy, sandbox, auto-exec | Inheriting global, overridden |
+| S09 | **Artifact Panel** | Muncul saat agent buat artifact | Lihat artifact (plan, report, dll) | Markdown render, tabs (Files Changed, Subagents, etc), download | Empty, populated |
+| S10 | **Auxiliary Pane — Subagents** | Tab di dalam Auxiliary Pane | Monitor subagent yang berjalan | Subagent list, status badge, logs | Empty, running, done, killed |
+| S11 | **Auxiliary Pane — Background Tasks** | Tab di dalam Auxiliary Pane | Monitor background tasks | Task list, progress, cancel button | Empty, running |
+| S12 | **Auxiliary Pane — Files Changed** | Tab di dalam Auxiliary Pane | Lihat diff file yang diubah agent | File tree diff, +/- lines, accept/reject | Empty, has changes |
+| S13 | **Auxiliary Pane — Terminals** | Tab di dalam Auxiliary Pane | Terminal terintegrasi | xterm.js terminal, multiple tabs, shell selector | Empty, active session |
+| S14 | **Model Selector Dropdown** | Klik nama model di chat | Ganti model AI aktif | Model list (Gemini, Claude, dll), thinking level selector | Default, switching |
+| S15 | **@ Mention Menu** | Ketik `@` di input | Attach konteks ke pesan | Category list: files, conversations, terminals, rules, MCP | Empty, search |
+| S16 | **Slash Command Menu** | Ketik `/` di input | Trigger slash commands | Command list, description, autocomplete | Filtered list |
+| S17 | **Permission Approval Dialog** | Saat agent mau jalankan cmd | User review & approve tool call | Command preview, Allow/Deny button, "always allow" option | Pending approval |
+| S18 | **Marketplace / Plugin Browser** | Dari Skills panel | Browse & install plugins/skills | Search, categories, plugin cards, install button | Browsing, installing |
 
 ---
 
 ## User Flows
 
 ```
-F01  First-time setup & sign-in
-     S01 → S05 (add account) → S16 (add BYOK key) → S04 (select model) → S02
+F01  Mulai chat dan jalankan task
+     S01 → S02 (kirim pesan) → S09 (artifact muncul) → S17 (approval jika perlu) → S02 (streaming response)
+     Edge: token habis di tengah, error API, permission denied
 
-F02  Start a coding task (normal mode)
-     S02 → S03 (type prompt) → S10 (review artifact/plan) → S09 (agent runs terminal) → S02
+F02  Ganti model AI di tengah percakapan
+     S02 → S14 (klik model selector) → pilih model → S02 (lanjut dari titik yang sama)
+     Edge: model tidak tersedia, rate limit
 
-F03  Enable Turbo Mode for full device access
-     S02 → S06 (toggle Turbo) → S12 (review/set rules) → S09 (unrestricted terminal) → S02
+F03  Kelola & switch project/workspace
+     S03 → S04 → pilih/tambah project → S01 (new conversation di project baru)
+     Edge: project folder tidak ditemukan
 
-F04  Hit token limit → resume session
-     S03 (token-limit error) → S17 (compaction banner) → S07 (resume dialog) → S04 (switch model) → S03 (continue)
+F04  Pakai terminal terintegrasi
+     S02 → S13 (buka terminal tab) → jalankan command → output di terminal
+     Edge: command gagal, permission denied, sandbox block
 
-F05  Add a second AI account for extra quota
-     S05 → S16 (add provider + key) → S15 (see combined quota) → S04 (auto-rotate accounts)
+F05  Review & approve tool call
+     S02 (agent mau jalankan tool) → S17 (dialog approval) → Allow/Deny → S02 (lanjut)
+     Edge: user deny → agent berhenti atau cari alternatif
 
-F06  Switch AI model mid-task without losing progress
-     S03 (rate-limit or manual) → S04 (pick new model) → S03 (agent resumes with same context)
+F06  Attach konteks dengan @mention
+     S02 (ketik @) → S15 (mention menu) → pilih file/conversation/terminal → konteks ter-attach → kirim
+     Edge: file tidak ditemukan, conversation terlalu lama
 
-F07  Run a swarm (parallel agents)
-     S11 → S19 (configure workers) → S02 (each worker edits own scope) → S19 (aggregate results)
+F07  Jalankan scheduled task
+     S05 → tambah task → set cron/timer → konfirmasi → task jalan di background → S11 (monitor)
+     Edge: task gagal, token habis saat jalan
 
-F08  Install an MCP plugin / skill
-     S13 → search marketplace → install → S14 (new slash command appears) → S03
+F08  Install skill / plugin
+     S06 → S18 (marketplace) → search → install → aktif di sidebar
+     Edge: install gagal, konflik plugin
 
-F09  Fork conversation to safe checkpoint
-     S18 (pick checkpoint) → S03 (branched session, original intact)
+F09  Resume task yang terhenti (FITUR UNIK)
+     S02 (task terhenti karena token habis) → notifikasi checkpoint → S14 (ganti model opsional)
+     → tombol "Resume from checkpoint" → agent lanjut dari titik terakhir
+     Edge: checkpoint tidak ditemukan, model berbeda tidak bisa baca konteks lama
 
-F10  Review and approve agent diff
-     S10 (diff artifact) → approve / request changes → S09 (agent applies or revises)
+F10  Lihat & kelola subagents
+     S02 → S10 (auxiliary pane subagents) → lihat status → kill/message subagent
+     Edge: subagent stuck, dead
 ```
 
 ---
 
-## Components
+## Component List
 
-| Component | Variants | States | Screens |
-|---|---|---|---|
-| Chat input box | Normal, Turbo-active | Empty, typing, sending, disabled | S03, S14 |
-| Model badge / selector | Gemini, Claude, GPT, Custom BYOK | Active, rate-limited, exceeded, switching | S03, S04, S11 |
-| Token / quota gauge | Per-account, aggregate | Under, warning (80%), exceeded | S03, S15 |
-| Agent status indicator | Idle, Thinking, Running, Error, Stalled | 5 states | S03, S11, S19 |
-| Artifact card | Plan, Diff, Screenshot, Terminal output | Preview, expanded, approved, rejected | S10 |
-| Turbo mode toggle | On, Off, Custom | 3 states + warning modal | S06, S09 status bar |
-| Session history entry | Resume candidate | With model, timestamp, goal snippet | S07 |
-| Account row | Google, Anthropic, OpenAI, Custom | Active, quota-ok, rate-limited, error | S05 |
-| Permission rule row | Allow, Deny, Ask | 3 rule types + glob scope | S12 |
-| Plugin card | Installed, Available, Auth-needed | 3 install states | S13 |
-| Worker card (swarm) | Coordinator, Worker | Idle, Working, Stalled, Done | S19 |
-| Slash command item | Built-in, Plugin-contributed | Normal, hovered, unavailable | S14 |
-| Context compaction banner | Warning, Compacting, Done | 3 states | S17 |
-| Checkpoint tree node | Fork point, Current | Active, archived | S18 |
+| Komponen | Variants | States | Dipakai di |
+|---------|---------|--------|------------|
+| ChatInput | default, with-attachment | empty, typing, sending, disabled | S01, S02 |
+| MessageBubble | user, assistant, tool-call, tool-result | default, streaming, error | S02 |
+| ToolCallCard | pending, approved, denied, running, done | collapsed, expanded | S02 |
+| ArtifactCard | plan, report, code, generative-ui | default, loading, done | S02, S09 |
+| ModelSelector | dropdown | default, open, switching | S14 |
+| ThinkingLevelSelector | Low/Med/High/Extra | default | S14 |
+| SidebarNav | default | collapsed, expanded | S03-S08 |
+| ConversationItem | default, active, pinned | hover, selected | S03 |
+| ProjectItem | default, active | hover, selected | S04 |
+| TerminalPane | default | empty, active, multiple-tabs | S13 |
+| DiffViewer | add, remove, modify | collapsed, expanded | S12 |
+| SlashCommandMenu | filtered list | open, search | S16 |
+| MentionMenu | files, conversations, terminals, rules | open, filtered | S15 |
+| PermissionDialog | allow, deny, always-allow | pending | S17 |
+| SettingsToggle | on/off, 3-way (allow/ask/deny) | default | S07, S08 |
+| StatusBadge | running, done, error, waiting | — | S10, S11 |
+| PluginCard | installed, not-installed | default, hover | S18 |
+| ProgressIndicator | thinking, streaming, tool-running | animated | S02 |
+| CheckpointBanner | resume-available | visible/hidden | S02 (FITUR UNIK) |
+| MultiAccountManager | account list, add form | default | S07 (FITUR UNIK) |
+| TokenUsageBar | per-account, per-day | normal, warning, limit | S07/S14 (FITUR UNIK) |
 
 ---
 
 ## Inferred Data Model
 
 ```
-Account
-  id, provider (google|anthropic|openai|custom), label, api_key (encrypted),
-  base_url (optional, for custom endpoints), priority_order (int),
-  quota_used (int tokens), quota_limit (int tokens), quota_reset_at (timestamptz),
-  is_active (bool), created_at, updated_at
-  evidence: S05, S15, S16
-  confidence: high
-
-Session
-  id, workspace_id, title, goal_text, model_id (last used), account_id (last used),
-  status (active|paused|completed|token-limit), context_snapshot (jsonb),
-  token_count (int), created_at, last_active_at
-  evidence: S03, S07, F04
+Conversation
+  id, project_id, title, created_at, updated_at,
+  model_id (active model), checkpoint_data (json — untuk resume),
+  goal (string — goal utama yang harus dicapai)
+  evidence: S01 new chat, S03 conversation list, F09 resume flow
   confidence: high
 
 Message
-  id, session_id, role (user|assistant|tool), content (text), model_id,
-  account_id, tokens_used (int), created_at
-  evidence: S03 chat history
+  id, conversation_id, role (user|assistant|tool), content (text/json),
+  tool_calls (json array), created_at, token_count,
+  model_id (model yang generate pesan ini)
+  evidence: S02 chat canvas, message bubbles
+  confidence: high
+
+ToolCall
+  id, message_id, tool_name, arguments (json), result (json),
+  status (pending|approved|denied|done|error), approved_by_user (bool)
+  evidence: S17 permission dialog, S02 tool call cards
   confidence: high
 
 Artifact
-  id, session_id, message_id, type (plan|diff|screenshot|terminal|generic),
-  content (jsonb/text), status (pending|approved|rejected), created_at
-  evidence: S10, F10
+  id, conversation_id, type (plan|report|code|generative-ui),
+  content (markdown/html/json), created_at, version
+  evidence: S09 artifact panel
   confidence: high
 
-Workspace
-  id, path (local dir), name, turbo_mode (bool), config (jsonb), created_at
-  evidence: S08, S20
-  confidence: high
-
-PermissionRule
-  id, workspace_id, tool_name, pattern (glob), action (allow|deny|ask),
+Project
+  id, name, path (local folder path), settings (json — override global),
   created_at
-  evidence: S12, S06
+  evidence: S04 projects panel, S08 project settings
   confidence: high
 
-Model
-  id, provider, name, display_name, context_window (int), is_byok (bool),
-  supports_thinking (bool), cost_per_1k_input, cost_per_1k_output
-  evidence: S04, S16
-  confidence: medium (inferred from public model cards)
+ModelAccount  [FITUR UNIK — tidak ada di original]
+  id, provider (gemini|claude|openai|openrouter|custom),
+  account_label (string — misal "Akun Gemini 1"),
+  api_key (encrypted AES),
+  is_active (bool), priority (int — urutan fallback),
+  token_limit_per_day (int), tokens_used_today (int),
+  last_used_at, last_reset_at
+  evidence: dirancang sendiri
+  confidence: designed
 
-AgentWorker (swarm)
-  id, session_id, name, role (coordinator|worker|verifier), model_id,
-  account_id, status (idle|working|stalled|done), workspace_branch,
-  created_at, last_heartbeat_at
-  evidence: S19, F07
+ModelConfig
+  id, name (display name), provider, model_id (string misal "gemini-2.0-flash"),
+  context_window, is_enabled
+  evidence: S14 model selector
+  confidence: high
+
+ScheduledTask
+  id, project_id, name, cron_expression, last_run_at, next_run_at,
+  status (active|paused|failed), conversation_template (json)
+  evidence: S05 scheduled tasks
+  confidence: high
+
+Checkpoint  [FITUR UNIK — resume progress]
+  id, conversation_id, message_index,
+  context_snapshot (json — full context untuk dikirim ke model baru),
+  goal_snapshot (string — goal yang harus dicapai),
+  progress_summary (string — ringkasan apa yang sudah selesai),
+  model_id_at_checkpoint, created_at
+  evidence: dirancang sendiri
+  confidence: designed
+
+Skill
+  id, name, source (builtin|local), enabled (bool), config (json)
+  evidence: S06 skills panel
   confidence: medium
-
-Plugin
-  id, name, source_url, type (mcp|skill|agent), config (jsonb),
-  is_enabled (bool), auth_vars (jsonb encrypted), installed_at
-  evidence: S13
-  confidence: high
-
-SlashCommand
-  id, name, description, plugin_id (nullable, null = built-in), handler_type,
-  keyboard_shortcut
-  evidence: S14
-  confidence: high
 ```
 
 ---
 
-## What Cannot Be Cloned
+## Yang TIDAK Bisa Di-clone
 
-| Item | Reason |
-|---|---|
-| Google AI model weights | Proprietary; use public API endpoints (Gemini API, Vertex AI) |
-| Anthropic / OpenAI model weights | Proprietary; use their public APIs with user's own keys |
-| Antigravity marketplace catalog | Proprietary content; build an open plugin registry instead |
-| Google account OAuth session tokens | Cannot impersonate; use user's own BYOK API keys |
-| Existing conversation data from user's AGY account | Privacy; user starts fresh or imports manually |
-| AGY binary / electron shell | Proprietary; rebuild on Electron or Tauri |
-
----
-
-## Size Estimate
-
-| Metric | Count |
-|---|---|
-| Screens | 20 |
-| Flows | 10 |
-| Entities | 10 |
-| Hard parts | Multi-model BYOK rotation, context compaction engine, Turbo mode permission system, session resume with model swap, swarm worker orchestration |
-
-**Size: L (a quarter) — or M if scoped to core loop only (F01–F06, skip swarm)**
-
-Hard parts ranked:
-1. **Context persistence + model-swap resume** — serialize full context, replay on new model
-2. **BYOK multi-account quota rotation** — rotate accounts automatically on rate-limit
-3. **Turbo Mode permission system** — OS-level file + process permissions, safe override layering
-
-Out of scope (v1): Swarm (F07), voice mode, mobile surface, IDE extension marketplace publishing
+| Item | Alasan | Alternatif |
+|------|--------|-----------|
+| Gemini model weights | Closed-source | Pakai API |
+| Antigravity Marketplace | Platform Google | Local folder / JSON registry |
+| Browser subagent (full CDP) | Sangat kompleks | Playwright basic |
+| Swarm realtime message board | Kompleks | Polling / SSE sederhana |
+| `agy` CLI exact behavior | IP Google | Buat CLI sendiri (opsional) |
+| Telemetry Google | Tidak butuh | — |
 
 ---
 
-## Summary
+## Ukuran Project: **L — estimasi 4-8 minggu build solo**
 
-**Core loop:** User adds N AI accounts with their own API keys → starts coding session → agent edits files, runs terminal → hits token limit → resumes on a different model/account without losing context.
+| Area | Prioritas | Kesulitan |
+|------|-----------|-----------|
+| Chat UI + streaming | must | Medium |
+| Multi-model/multi-akun + token rotation | must | Medium (pakai LiteLLM) |
+| Integrated terminal | must | Medium-Hard |
+| Resume/checkpoint system | must | Hard ⭐ |
+| Turbo Mode (local FS access) | must | Medium |
+| Artifact rendering | must | Medium |
+| File explorer + Monaco editor | must | Medium |
+| Settings + permissions UI | must | Easy |
+| Subagents monitor | should | Medium |
+| Scheduled tasks | could | Easy-Medium |
+| Swarm | could | Hard — Fase 2 |
 
-- **20 screens, 10 flows, 10 entities**
-- **3 hardest parts:** Context resume across model swap · BYOK multi-account rotation · Turbo Mode OS permissions
-- **Out of scope v1:** Swarm orchestration, voice mode, mobile, publishing to extension stores
-- **Next step:** `/replica-architect`
+---
+
+## Stack Final
+
+```
+Frontend : React 18 + Vite + TailwindCSS + shadcn/ui
+Editor   : Monaco Editor
+Terminal : xterm.js + node-pty (via backend WebSocket)
+Backend  : Python 3.11 + FastAPI + WebSocket
+AI Router: LiteLLM (handle multi-provider + key rotation + fallback)
+Database : SQLite (via SQLAlchemy) — file lokal, no server
+Launch   : start.bat → uvicorn + vite → auto buka browser
+```
+
+---
+
+## 5-Line Summary
+
+**Core loop:** User chat → agent jalankan tools (file/terminal/web) → streaming response + artifacts
+**Counts:** 18 screens, 10 user flows, 9 entities data model
+**3 Bagian Paling Sulit:** (1) Resume/checkpoint system dengan goal-tracking lintas model, (2) xterm.js + node-pty WebSocket bridge, (3) Multi-akun token rotation logic
+**Out of scope (fase 1):** Swarm realtime, full browser subagent, marketplace online
+**Step berikutnya:** `replica-architect` — desain database schema + API routes + build order

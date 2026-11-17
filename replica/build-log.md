@@ -1,21 +1,18 @@
-# Build Log — Antigravity IDE Clone
-> Skill: `replica-build` · Started: 2026-11-16 · Updated: 2026-11-16
+# Replica Build Log — Antigravity Clone (AGY Local)
+**Start Date:** 2026-11-17
+**Platform:** Web App (Localhost + Turbo Mode)
 
-## Milestone 1 & 2: Shell & Vertical Slice (Core Loop)
-
-| Screen / Step | Date | Status | Missing / Notes | What was harder than expected |
+| Screen ID / Feature | Date | Status | Notes | Harder Than Expected |
 |---|---|---|---|---|
-| Project Setup & Shell | 2026-11-16 | Done | Vite + React 19 + TypeScript + Tailwind v4 + Monaco Editor | Rebuilt cleanly without unused imports |
-| S02 Main IDE Layout | 2026-11-16 | Done | Activity Bar, collapsible sidebar drawer, editor canvas, terminal, status bar | Window layout splits & theme variable inheritance |
-| S03 Agent Chat Panel | 2026-11-16 | Done | Chat stream, reasoning indicator, status dot, compaction banner, token counter | State sync during simulated streaming turns |
-| S04 Model Selector | 2026-11-16 | Done | Multi-model dropdown in status bar (Gemini 2.5 Flash/Pro, Claude 3.7 Sonnet, GPT-4o, o3-mini) | Real-time active model switching on the fly |
-| S05 Account Manager | 2026-11-16 | Done | BYOK multi-account pooling, live token progress bars, priority ordering | Rate-limit 429 auto-failover simulation |
-| S06 Turbo Mode Panel | 2026-11-16 | Done | Turbo Mode toggle with visual warnings, unsandboxed execution mode | Distinguishing Turbo default vs user override rules |
-| S07 Session Resume Dialog | 2026-11-16 | Done | Interrupted session picker, target goal retention, model & account swapper | Preserving exact task goal when switching LLM architecture |
-| S08 Workspace View | 2026-11-16 | Done | Explorer panel, file hierarchy, file tab opening | Dynamic tab management |
-| S09 Terminal Panel | 2026-11-16 | Done | Integrated terminal with Turbo mode indicator, command execution | Turbo tag differentiation in command stream |
-| S10 Artifact Viewer | 2026-11-16 | Done | Plan review cards, diff patches, approve/reject file modifier | Inline file patch application to active editor state |
-| S12 Permissions Settings | 2026-11-16 | Done | Allow/Deny/Ask rules editor with tool and glob pattern matching | Deterministic priority evaluation |
-| S15 Token / Quota Dashboard | 2026-11-16 | Done | Live gauge per account in status bar and Account Manager | Token counting calculations |
-| S16 BYOK Configuration | 2026-11-16 | Done | Provider selection, custom API key input, base URL | Provider-agnostic credential validation |
-| S17 Context Compaction | 2026-11-16 | Done | Compaction banner and manual context memory compression | Retaining goal intent while reducing token footprint |
+| S01 (Home / New Task) | 2026-11-17 | done | Initial prompt, quick actions, model selector | None |
+| S02 (Chat Canvas) | 2026-11-17 | done | Real-time SSE streaming, Markdown, Code syntax | Multi-step streaming coordination |
+| S03 (Conversation List) | 2026-11-17 | done | SQLite persistent conversation list, delete, active highlight | None |
+| S07 (Settings & Multi-Account) | 2026-11-17 | done | Pool multiple accounts/keys per provider, priority fallback, verify key button | Encryption key management |
+| S13 (Integrated Terminal) | 2026-11-17 | done | xterm.js embedded terminal with WebSocket bridge to local PowerShell | Windows pseudo-terminal compatibility |
+| S14 (Model Selector) | 2026-11-17 | done | Selector for Gemini, Claude, GPT-4o, DeepSeek + Thinking Budget | None |
+| S16 (Slash Commands) | 2026-11-17 | done | Popup menu for /plan, /goal, /terminal, /checkpoint | Textarea trigger positioning |
+| S17 (Permission Approval) | 2026-11-17 | done | Action approval card with Allow/Deny, bypassed in Turbo Mode | Syncing async agent loops with UI approvals |
+| Checkpoint & Resume | 2026-11-17 | done | Auto checkpoint on token/rate limit, resume with model switch option | Cross-model context translation |
+| Turbo Mode | 2026-11-17 | done | Direct local filesystem access & shell execution toggle | Safety constraints vs unrestricted access |
+| BansosAI & Custom OpenAI Gateway | 2026-11-17 | done | Custom Base URL endpoint, auto-fetch models from /v1/models, key pooling | Dynamic proxy routing |
+| 🤖 Smart Task Router (Auto Mode) | 2026-11-17 | done | Analyzes task complexity (Heavy vs Light) and routes to optimal AI model | Rule-based heuristic categorization |
