@@ -1,5 +1,10 @@
 # 🪐 Orbit Agent (Autonomous Coding IDE)
 
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![React](https://img.shields.io/badge/Frontend-React_18_%2B_Vite-61dafb.svg)](https://react.dev/)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
+[![Local Engine](https://img.shields.io/badge/Local_AI-Nous_Hermes-orange.svg)](https://nousresearch.com/)
+
 **Orbit Agent** adalah autonomous coding assistant & development environment yang dirancang khusus untuk berjalan **100% lokal** di mesin PC Anda dengan fleksibilitas model AI tanpa batas (Cloud AI + Local AI Engine).
 
 ---
@@ -59,8 +64,8 @@ Sebelum menginstal, pastikan komputer sudah terpasang:
 
 1. Clone repositori ini:
    ```bash
-   git clone https://github.com/username/orbit-agent.git
-   cd orbit-agent
+   git clone https://github.com/rdent888/ORbit-agent.git
+   cd ORbit-agent
    ```
 2. Cukup klik ganda (double-click) file:
    ```cmd
@@ -79,8 +84,8 @@ Sebelum menginstal, pastikan komputer sudah terpasang:
 
 1. **Clone & Masuk ke Folder Proyek:**
    ```bash
-   git clone https://github.com/username/orbit-agent.git
-   cd orbit-agent
+   git clone https://github.com/rdent888/ORbit-agent.git
+   cd ORbit-agent
    ```
 
 2. **Setup Backend (Python):**
@@ -105,3 +110,10 @@ Sebelum menginstal, pastikan komputer sudah terpasang:
 
 4. Buka browser di **`http://localhost:5173`**.
 5. Buka menu **Model Accounts & Keys** (pojok kiri bawah) untuk menambahkan API Key favorit Anda (Google Gemini, Claude, OpenAI, atau Hermes Local Engine).
+
+---
+
+## 📄 Lisensi
+
+Proyek ini dilisensikan di bawah lisensi **Apache 2.0** — lihat file [LICENSE](LICENSE) untuk detail lengkap.
+Hak Cipta © 2026 rdent888.
