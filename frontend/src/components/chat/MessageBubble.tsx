@@ -424,7 +424,7 @@ export const MessageBubble: React.FC<Props> = ({ message }) => {
 
           {/* Clean Markdown Text Content */}
           {cleanText && (
-            <div className="p-4 rounded-2xl rounded-tl-sm bg-[#0d1117] border border-zinc-800/80 shadow-md text-sm leading-relaxed text-zinc-200 prose prose-invert max-w-none prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-800 prose-pre:rounded-xl prose-code:text-emerald-400 break-words">
+            <div className="p-4 rounded-2xl rounded-tl-sm bg-[#0d1117] border border-zinc-800/80 shadow-md text-sm leading-relaxed text-zinc-200 prose prose-invert max-w-none prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-800 prose-pre:rounded-xl prose-code:text-emerald-400 prose-p:leading-relaxed prose-p:my-2 prose-headings:text-zinc-100 prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h2:mt-5 prose-h3:text-sm prose-h3:mt-4 prose-li:text-zinc-200 prose-li:my-0.5 prose-ul:my-2 prose-ol:my-2 prose-strong:text-zinc-100 prose-blockquote:border-indigo-500 prose-blockquote:text-zinc-400 break-words">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {cleanText}
               </ReactMarkdown>

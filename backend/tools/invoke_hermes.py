@@ -33,7 +33,7 @@ SCHEMA = {
 }
 
 def _clean_output(raw: str) -> str:
-    """Strip ANSI escape sequences and format Hermes output cleanly."""
+    """Strip ANSI escape sequences from Hermes output."""
     ansi_escape = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\([B0]')
     cleaned = ansi_escape.sub('', raw)
     cleaned = re.sub(r'38;2;\d+;\d+;\d+m?', '', cleaned)
@@ -60,7 +60,8 @@ async def execute(args: dict, turbo: bool = False) -> str:
     if not os.path.exists(HERMES_BIN):
         return f"Error: Hermes binary not found at '{HERMES_BIN}'."
 
-    cmd_args = [HERMES_BIN, "chat", "-q", task]
+    # -Q flag: output clean final response only (no ANSI header/footer noise)
+    cmd_args = [HERMES_BIN, "chat", "-q", task, "-Q"]
     if cwd and os.path.isdir(cwd):
         cmd_args.extend(["--in", cwd])
 
@@ -68,12 +69,13 @@ async def execute(args: dict, turbo: bool = False) -> str:
         # Use asyncio.to_thread to avoid Windows SelectorEventLoop NotImplementedError
         returncode, stdout, stderr = await asyncio.to_thread(_run_hermes_sync, cmd_args, cwd, timeout)
 
-        cleaned_out = _clean_output(stdout)
+        # With -Q flag, stdout is already the clean response — no header/footer stripping needed
+        result_content = _clean_output(stdout)
         cleaned_err = _clean_output(stderr)
 
-        result_content = cleaned_out
-        if "☤ Hermes" in cleaned_out:
-            parts = cleaned_out.split("☤ Hermes", 1)
+        # Fallback: if -Q somehow still includes header, strip it
+        if "☤ Hermes" in result_content:
+            parts = result_content.split("☤ Hermes", 1)
             result_content = parts[1].strip()
             if "Resume this session with:" in result_content:
                 result_content = result_content.split("Resume this session with:")[0].strip()

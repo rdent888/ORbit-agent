@@ -9,6 +9,7 @@ Supports:
 4. Auto-fallback across accounts and alternative models on 503 high demand or 429 rate limit.
 """
 import os, json, datetime, asyncio, re
+import subprocess
 from typing import AsyncIterator, Tuple
 import litellm
 from sqlalchemy.orm import Session
@@ -18,10 +19,10 @@ from services.task_analyzer import analyze_task_complexity
 
 HERMES_BIN = r"C:\Users\rdent\AppData\Local\hermes\bin\hermes.exe"
 
-def _start_hermes_process(user_prompt: str):
-    import subprocess
+def _start_hermes_stream_json(user_prompt: str):
+    """Start Hermes with --format stream-json for clean JSONL token streaming."""
     return subprocess.Popen(
-        [HERMES_BIN, "chat", "-q", user_prompt],
+        [HERMES_BIN, "chat", "-q", user_prompt, "--format", "stream-json"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -30,34 +31,38 @@ def _start_hermes_process(user_prompt: str):
     )
 
 async def _stream_hermes(messages: list[dict]) -> AsyncIterator[str]:
-    """Execute local Hermes Agent and stream output chunks."""
+    """Execute local Hermes Agent and stream clean Markdown output using stream-json format."""
     if not os.path.exists(HERMES_BIN):
         yield "\n[Error: Hermes binary not found at C:\\Users\\rdent\\AppData\\Local\\hermes\\bin\\hermes.exe]"
         return
 
     user_prompt = messages[-1]["content"] if messages else "Hello"
-    ansi_escape = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\([B0]')
 
     try:
-        proc = await asyncio.to_thread(_start_hermes_process, user_prompt)
-        started_output = False
+        proc = await asyncio.to_thread(_start_hermes_stream_json, user_prompt)
 
         while True:
             line = await asyncio.to_thread(proc.stdout.readline)
             if not line:
                 break
-            if "☤ Hermes" in line:
-                started_output = True
+            line = line.strip()
+            if not line:
                 continue
-            if started_output:
-                if "Resume this session with:" in line:
-                    break
-                clean = ansi_escape.sub('', line)
-                clean = re.sub(r'38;2;\d+;\d+;\d+m?', '', clean)
-                if clean:
-                    yield clean
+            try:
+                event = json.loads(line)
+                if event.get("type") == "text":
+                    text = event.get("text", "")
+                    if text:
+                        yield text
+            except json.JSONDecodeError:
+                # Fallback: yield raw line jika bukan valid JSON (edge case)
+                pass
 
-        proc.kill()
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
     except Exception as ex:
         yield f"\n[Hermes Error: {type(ex).__name__} - {ex}]"
 
