@@ -8,7 +8,7 @@ Supports:
    - Light tasks -> Flash Lite/Mini/Fast models
 4. Auto-fallback across accounts and alternative models on 503 high demand or 429 rate limit.
 """
-import os, json, datetime, asyncio, re
+import os, json, datetime, asyncio, re, tempfile
 import subprocess
 from typing import AsyncIterator, Tuple
 import litellm
@@ -19,10 +19,67 @@ from services.task_analyzer import analyze_task_complexity
 
 HERMES_BIN = r"C:\Users\rdent\AppData\Local\hermes\bin\hermes.exe"
 
-def _start_hermes_stream_json(user_prompt: str):
-    """Start Hermes with --format stream-json for clean JSONL token streaming."""
+def _build_hermes_context_prompt(messages: list[dict]) -> str:
+    """Format full multi-turn conversation memory into Hermes prompt so it retains full context."""
+    if not messages:
+        return "Hello"
+
+    system_instructions = ""
+    history_lines = []
+    current_prompt = ""
+
+    for m in messages:
+        role = m.get("role", "")
+        content = (m.get("content") or "").strip()
+        if not content:
+            continue
+
+        if role == "system":
+            # Extract high-level goal or primary guidance
+            if "PRIMARY GOAL:" in content:
+                goal_part = content.split("PRIMARY GOAL:")[-1].strip()
+                system_instructions = f"Primary Goal: {goal_part}"
+        elif role == "user":
+            history_lines.append(f"User: {content}")
+        elif role == "assistant":
+            history_lines.append(f"Assistant: {content}")
+
+    if not history_lines:
+        return messages[-1].get("content", "Hello")
+
+    # If only 1 user turn, pass as is
+    if len(history_lines) == 1 and history_lines[0].startswith("User: "):
+        current_prompt = history_lines[0][6:]
+        if system_instructions:
+            return f"[Instruction: {system_instructions}]\n\n{current_prompt}"
+        return current_prompt
+
+    # Multi-turn memory: format dialogue history + current user message
+    # Take last up to 12 messages to keep prompt focused and within Hermes token budget
+    trimmed_history = history_lines[-12:]
+    earlier_turns = trimmed_history[:-1]
+    latest_turn = trimmed_history[-1]
+
+    # Extract clean user query from latest turn if present
+    latest_content = latest_turn[6:] if latest_turn.startswith("User: ") else latest_turn
+
+    parts = []
+    if system_instructions:
+        parts.append(f"--- [PANDUAN & GOAL UTAMA] ---\n{system_instructions}\n")
+
+    parts.append("--- [RIWAYAT PERCAKAPAN SEBELUMNYA DALAM ROOM INI] ---")
+    for turn in earlier_turns:
+        parts.append(turn)
+    parts.append("--- [AKHIR RIWAYAT PERCAKAPAN] ---\n")
+
+    parts.append(f"--- [PESAN TERKINI DARI USER - JAWAB DENGAN MEMPERHATIKAN RIWAYAT DI ATAS] ---\nUser: {latest_content}")
+
+    return "\n\n".join(parts)
+
+def _start_hermes_stream_json(prompt_file_path: str):
+    """Start Hermes with --query-file and --format stream-json for clean JSONL token streaming with full memory."""
     return subprocess.Popen(
-        [HERMES_BIN, "chat", "-q", user_prompt, "--format", "stream-json"],
+        [HERMES_BIN, "chat", "--query-file", prompt_file_path, "--format", "stream-json"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -31,15 +88,21 @@ def _start_hermes_stream_json(user_prompt: str):
     )
 
 async def _stream_hermes(messages: list[dict]) -> AsyncIterator[str]:
-    """Execute local Hermes Agent and stream clean Markdown output using stream-json format."""
+    """Execute local Hermes Agent and stream clean Markdown output using stream-json format with memory context."""
     if not os.path.exists(HERMES_BIN):
         yield "\n[Error: Hermes binary not found at C:\\Users\\rdent\\AppData\\Local\\hermes\\bin\\hermes.exe]"
         return
 
-    user_prompt = messages[-1]["content"] if messages else "Hello"
+    full_context_prompt = _build_hermes_context_prompt(messages)
 
+    # Use a temporary file for query-file to avoid shell escaping issues and length limits on Windows
+    temp_file = None
     try:
-        proc = await asyncio.to_thread(_start_hermes_stream_json, user_prompt)
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".txt") as tf:
+            tf.write(full_context_prompt)
+            temp_file = tf.name
+
+        proc = await asyncio.to_thread(_start_hermes_stream_json, temp_file)
 
         while True:
             line = await asyncio.to_thread(proc.stdout.readline)
@@ -55,7 +118,6 @@ async def _stream_hermes(messages: list[dict]) -> AsyncIterator[str]:
                     if text:
                         yield text
             except json.JSONDecodeError:
-                # Fallback: yield raw line jika bukan valid JSON (edge case)
                 pass
 
         try:
@@ -65,6 +127,12 @@ async def _stream_hermes(messages: list[dict]) -> AsyncIterator[str]:
 
     except Exception as ex:
         yield f"\n[Hermes Error: {type(ex).__name__} - {ex}]"
+    finally:
+        if temp_file and os.path.exists(temp_file):
+            try:
+                os.remove(temp_file)
+            except Exception:
+                pass
 
 litellm.drop_params = True          # ignore unsupported params per model
 litellm.set_verbose = False
