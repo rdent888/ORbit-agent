@@ -9,8 +9,8 @@ export const AuxiliaryPane: React.FC = () => {
   if (auxTab !== "settings") return null;
 
   return (
-    <div className="w-[480px] border-l border-zinc-800 bg-[#0d1117] flex flex-col h-full shrink-0 relative shadow-2xl z-40">
-      <div className="h-12 px-5 flex items-center justify-between border-b border-zinc-800/80 bg-zinc-950/90 shrink-0">
+    <div className="w-[460px] max-w-[90vw] border-l border-zinc-800 bg-[#0d1117] flex flex-col h-full shrink-0 overflow-hidden shadow-2xl z-40">
+      <div className="h-10 px-4 flex items-center justify-between border-b border-zinc-800/80 bg-zinc-950/90 shrink-0">
         <span className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
           Model Settings & Accounts
         </span>
@@ -23,7 +23,7 @@ export const AuxiliaryPane: React.FC = () => {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0">
         <ModelAccountManager />
       </div>
     </div>

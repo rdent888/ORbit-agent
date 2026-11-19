@@ -1,8 +1,30 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { api } from "../../lib/api";
 import type { ModelAccount } from "../../lib/api";
 import { useChatStore } from "../../stores/chatStore";
-import { Key, Plus, Trash2, CheckCircle2, XCircle, DownloadCloud, Layers } from "lucide-react";
+import {
+  Key, Plus, Trash2, CheckCircle2, XCircle, DownloadCloud, Layers,
+  Pencil, Save, X as IconX, ChevronUp, ChevronDown,
+} from "lucide-react";
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+function getNextPriority(providerKey: string, accs: ModelAccount[]): number {
+  const same = accs.filter((a) => a.provider === providerKey);
+  if (same.length === 0) return 0;
+  return Math.max(...same.map((a) => a.priority)) + 1;
+}
+
+// Sort: group by provider name asc, then priority asc
+function sortAccounts(accs: ModelAccount[]): ModelAccount[] {
+  return [...accs].sort((a, b) => {
+    const pc = a.provider.localeCompare(b.provider);
+    if (pc !== 0) return pc;
+    return a.priority - b.priority;
+  });
+}
+
+// ─── component ──────────────────────────────────────────────────────────────
 
 export const ModelAccountManager: React.FC = () => {
   const { fetchModelConfigs, modelConfigs } = useChatStore();
@@ -17,6 +39,14 @@ export const ModelAccountManager: React.FC = () => {
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ id: string; ok: boolean; msg: string } | null>(null);
 
+  // ── edit state ──
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editPriority, setEditPriority] = useState(0);
+  const [editTokenLimit, setEditTokenLimit] = useState(0);
+  const [editApiKey, setEditApiKey] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
   // Custom Model form
   const [customModelId, setCustomModelId] = useState("");
   const [customDisplayName, setCustomDisplayName] = useState("");
@@ -24,23 +54,29 @@ export const ModelAccountManager: React.FC = () => {
   const [fetchingModels, setFetchingModels] = useState(false);
   const [fetchMsg, setFetchMsg] = useState<string | null>(null);
 
-  const fetchAccounts = async () => {
+  const fetchAccounts = useCallback(async () => {
     try {
       const res = await api.get("/api/model-accounts");
-      setAccounts(res.data);
+      setAccounts(sortAccounts(res.data));
     } catch (e) {
       console.error("fetchAccounts error", e);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchAccounts();
     fetchModelConfigs();
   }, []);
 
-  // When provider changes, auto-fill base URL for bansosai / hermes / ollama
+  // Auto-fill next priority slot when accounts load
+  useEffect(() => {
+    setPriority(getNextPriority(provider, accounts));
+  }, [accounts]);
+
+  // ── provider change ──────────────────────────────────────────────────────
   const handleProviderChange = (newP: string) => {
     setProvider(newP);
+    setPriority(getNextPriority(newP, accounts));
     if (newP === "hermes") {
       setBaseUrl("http://127.0.0.1:8645/v1");
       if (!label) setLabel("Hermes Agent (Local PC / Nous Portal)");
@@ -58,6 +94,7 @@ export const ModelAccountManager: React.FC = () => {
     }
   };
 
+  // ── add account ──────────────────────────────────────────────────────────
   const handleAddAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!label.trim() || !apiKey.trim()) return;
@@ -81,16 +118,18 @@ export const ModelAccountManager: React.FC = () => {
     }
   };
 
+  // ── delete account ───────────────────────────────────────────────────────
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to remove this account?")) return;
     try {
       await api.delete(`/api/model-accounts/${id}`);
-      setAccounts(accounts.filter((a) => a.id !== id));
+      setAccounts((prev) => sortAccounts(prev.filter((a) => a.id !== id)));
     } catch (e) {
       console.error("delete account failed", e);
     }
   };
 
+  // ── test key ─────────────────────────────────────────────────────────────
   const handleTest = async (id: string) => {
     setTestingId(id);
     setTestResult(null);
@@ -108,7 +147,52 @@ export const ModelAccountManager: React.FC = () => {
     }
   };
 
-  // Auto fetch models from provider /models endpoint
+  // ── edit helpers ─────────────────────────────────────────────────────────
+  const startEdit = (acc: ModelAccount) => {
+    setEditingId(acc.id);
+    setEditLabel(acc.account_label);
+    setEditPriority(acc.priority);
+    setEditTokenLimit(acc.token_limit_per_day ?? 0);
+    setEditApiKey("");          // keep empty; only send if user types a new one
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditApiKey("");
+  };
+
+  const handleSaveEdit = async (id: string) => {
+    setEditSaving(true);
+    try {
+      const payload: Record<string, unknown> = {
+        account_label: editLabel.trim(),
+        priority: editPriority,
+        token_limit_per_day: editTokenLimit,
+      };
+      if (editApiKey.trim()) payload.api_key = editApiKey.trim();
+      await api.patch(`/api/model-accounts/${id}`, payload);
+      await fetchAccounts();
+      setEditingId(null);
+      setEditApiKey("");
+    } catch (e: any) {
+      alert("Gagal menyimpan: " + (e?.response?.data?.detail || e.message));
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  // Quick priority ±1 without opening full edit
+  const quickPriority = async (acc: ModelAccount, delta: number) => {
+    const newP = Math.max(0, acc.priority + delta);
+    try {
+      await api.patch(`/api/model-accounts/${acc.id}`, { priority: newP });
+      await fetchAccounts();
+    } catch (e: any) {
+      alert("Gagal update priority: " + (e?.response?.data?.detail || e.message));
+    }
+  };
+
+  // ── fetch models from provider ───────────────────────────────────────────
   const handleFetchModels = async () => {
     if (!apiKey.trim()) {
       alert("Please enter the API Key first.");
@@ -119,7 +203,6 @@ export const ModelAccountManager: React.FC = () => {
       alert("Please provide the Base URL for this provider.");
       return;
     }
-
     setFetchingModels(true);
     setFetchMsg(null);
     try {
@@ -128,7 +211,12 @@ export const ModelAccountManager: React.FC = () => {
         api_key: apiKey.trim(),
         provider_label: provider,
       });
-      setFetchMsg(`✔ Berhasil mengimpor ${res.data.imported_count} model dari ${provider}!`);
+      const skipped = res.data.skipped_count ?? 0;
+      setFetchMsg(
+        `✔ Berhasil mengimpor ${res.data.imported_count} model baru dari ${provider}` +
+          (skipped > 0 ? ` · ${skipped} model sudah ada (dilewati, tidak duplikat)` : "") +
+          "!"
+      );
       await fetchModelConfigs();
     } catch (e: any) {
       setFetchMsg(`✖ Gagal mengambil model: ${e?.response?.data?.detail || e.message}`);
@@ -137,6 +225,7 @@ export const ModelAccountManager: React.FC = () => {
     }
   };
 
+  // ── add custom model ─────────────────────────────────────────────────────
   const handleAddCustomModel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customModelId.trim()) return;
@@ -170,6 +259,16 @@ export const ModelAccountManager: React.FC = () => {
     }
   };
 
+  // ── group accounts by provider for display ───────────────────────────────
+  const grouped = accounts.reduce<Record<string, ModelAccount[]>>((acc, item) => {
+    if (!acc[item.provider]) acc[item.provider] = [];
+    acc[item.provider].push(item);
+    return acc;
+  }, {});
+
+  const nextSlot = getNextPriority(provider, accounts);
+
+  // ── render ───────────────────────────────────────────────────────────────
   return (
     <div className="p-6 text-zinc-200 overflow-y-auto max-h-full space-y-8">
       {/* Header */}
@@ -185,7 +284,7 @@ export const ModelAccountManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Add Account Form */}
+      {/* ── Add Account Form ── */}
       <form onSubmit={handleAddAccount} className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 space-y-4">
         <h4 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
           <Plus className="w-4 h-4 text-emerald-400" />
@@ -223,8 +322,8 @@ export const ModelAccountManager: React.FC = () => {
             />
           </div>
 
-          {/* Base URL (visible for custom, bansosai, ollama) */}
-          {(provider === "bansosai" || provider === "custom" || provider === "ollama") && (
+          {/* Base URL (visible for custom, bansosai, hermes, ollama) */}
+          {(provider === "bansosai" || provider === "custom" || provider === "ollama" || provider === "hermes") && (
             <div className="md:col-span-2">
               <label className="block text-[11px] text-zinc-400 mb-1">
                 Base URL Endpoint (OpenAI-compatible)
@@ -252,11 +351,17 @@ export const ModelAccountManager: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-[11px] text-zinc-400 mb-1">Prioritas (0 = dipakai pertama, 1 = cadangan)</label>
+            <label className="block text-[11px] text-zinc-400 mb-1 flex items-center gap-1.5">
+              Prioritas (0 = dipakai pertama, 1 = cadangan)
+              <span className="ml-auto px-1.5 py-0.5 rounded bg-blue-950/60 border border-blue-700/40 text-blue-300 text-[10px] font-mono">
+                Slot Otomatis: #{nextSlot}
+              </span>
+            </label>
             <input
               type="number"
               value={priority}
               onChange={(e) => setPriority(Number(e.target.value))}
+              min={0}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-200 outline-none"
             />
           </div>
@@ -304,7 +409,7 @@ export const ModelAccountManager: React.FC = () => {
         )}
       </form>
 
-      {/* Account Pool List */}
+      {/* ── Account Pool List ── */}
       <div>
         <h4 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-3">
           Akun API Terdaftar ({accounts.length})
@@ -315,59 +420,212 @@ export const ModelAccountManager: React.FC = () => {
             Belum ada akun API. Tambahkan API key Gemini atau BansosAI kamu di atas!
           </div>
         ) : (
-          <div className="space-y-2.5">
-            {accounts.map((acc) => (
-              <div
-                key={acc.id}
-                className="p-3.5 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-between gap-4 hover:border-zinc-700 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center font-bold text-xs uppercase text-zinc-300">
-                    {acc.provider.slice(0, 2)}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-zinc-200">{acc.account_label}</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
-                        Priority: {acc.priority}
-                      </span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">
-                        {acc.provider}
-                      </span>
-                    </div>
-                    <div className="text-[11px] font-mono text-zinc-500 mt-0.5">
-                      Key: {acc.api_key_masked} • Hari Ini: {acc.tokens_used_today.toLocaleString()} tokens
-                    </div>
-                  </div>
+          <div className="space-y-4">
+            {Object.entries(grouped).map(([prov, accs]) => (
+              <div key={prov}>
+                {/* Provider group header */}
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+                    {prov}
+                  </span>
+                  <span className="text-[10px] text-zinc-600">{accs.length} akun · priority 0 = utama</span>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {testResult && testResult.id === acc.id && (
-                    <span
-                      className={`text-[11px] font-medium flex items-center gap-1 ${
-                        testResult.ok ? "text-emerald-400" : "text-red-400"
-                      }`}
-                    >
-                      {testResult.ok ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                      {testResult.msg}
-                    </span>
+                <div className="space-y-2">
+                  {accs.map((acc) =>
+                    editingId === acc.id ? (
+                      /* ── Inline Edit Form ── */
+                      <div
+                        key={acc.id}
+                        className="p-3.5 rounded-xl bg-zinc-900 border border-blue-700/50 space-y-3"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <Pencil className="w-3.5 h-3.5 text-blue-400" />
+                          <span className="text-xs font-semibold text-blue-300">Edit Akun: {acc.provider}</span>
+                          <button
+                            onClick={cancelEdit}
+                            className="ml-auto p-1 rounded hover:bg-zinc-700 text-zinc-500 hover:text-zinc-200 transition-colors"
+                          >
+                            <IconX className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="block text-[11px] text-zinc-400 mb-1">Label Akun</label>
+                            <input
+                              type="text"
+                              value={editLabel}
+                              onChange={(e) => setEditLabel(e.target.value)}
+                              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] text-zinc-400 mb-1">
+                              Prioritas
+                              <span className="ml-1 text-zinc-600">(0 = utama, makin besar = fallback)</span>
+                            </label>
+                            <input
+                              type="number"
+                              value={editPriority}
+                              onChange={(e) => setEditPriority(Number(e.target.value))}
+                              min={0}
+                              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] text-zinc-400 mb-1">
+                              Batas Token Harian <span className="text-zinc-600">(0 = tanpa batas)</span>
+                            </label>
+                            <input
+                              type="number"
+                              value={editTokenLimit}
+                              onChange={(e) => setEditTokenLimit(Number(e.target.value))}
+                              min={0}
+                              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] text-zinc-400 mb-1">
+                              API Key Baru <span className="text-zinc-600">(kosongkan = tidak berubah)</span>
+                            </label>
+                            <input
+                              type="password"
+                              placeholder="••••••••"
+                              value={editApiKey}
+                              onChange={(e) => setEditApiKey(e.target.value)}
+                              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 outline-none focus:border-blue-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            onClick={() => handleSaveEdit(acc.id)}
+                            disabled={editSaving}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors"
+                          >
+                            <Save className="w-3.5 h-3.5" />
+                            {editSaving ? "Menyimpan..." : "Simpan Perubahan"}
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs transition-colors"
+                          >
+                            Batal
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* ── Account Card ── */
+                      <div
+                        key={acc.id}
+                        className="p-3.5 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-between gap-4 hover:border-zinc-700 transition-colors"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {/* Priority badge + quick adjust */}
+                          <div className="flex flex-col items-center gap-0.5 shrink-0">
+                            <button
+                              onClick={() => quickPriority(acc, -1)}
+                              disabled={acc.priority === 0}
+                              className="p-0.5 rounded hover:bg-zinc-700 text-zinc-500 hover:text-zinc-200 disabled:opacity-30 transition-colors"
+                              title="Naikkan priority (lebih utama)"
+                            >
+                              <ChevronUp className="w-3 h-3" />
+                            </button>
+                            <span className="text-[10px] font-mono font-bold text-zinc-300 w-5 text-center leading-none">
+                              #{acc.priority}
+                            </span>
+                            <button
+                              onClick={() => quickPriority(acc, +1)}
+                              className="p-0.5 rounded hover:bg-zinc-700 text-zinc-500 hover:text-zinc-200 transition-colors"
+                              title="Turunkan priority (jadikan fallback)"
+                            >
+                              <ChevronDown className="w-3 h-3" />
+                            </button>
+                          </div>
+
+                          {/* Avatar */}
+                          <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center font-bold text-xs uppercase text-zinc-300 shrink-0">
+                            {acc.provider.slice(0, 2)}
+                          </div>
+
+                          {/* Info */}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-semibold text-zinc-200">{acc.account_label}</span>
+                              {acc.priority === 0 && (
+                                <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/40 text-emerald-400 font-bold uppercase tracking-wider">
+                                  Utama
+                                </span>
+                              )}
+                              {acc.priority === 1 && (
+                                <span className="text-[9px] px-1 py-0.5 rounded bg-yellow-950/60 border border-yellow-700/40 text-yellow-400 font-bold uppercase tracking-wider">
+                                  Cadangan
+                                </span>
+                              )}
+                              {acc.priority >= 2 && (
+                                <span className="text-[9px] px-1 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-400 font-bold uppercase tracking-wider">
+                                  Fallback #{acc.priority}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] font-mono text-zinc-500 mt-0.5 truncate">
+                              Key: {acc.api_key_masked} • Hari Ini: {acc.tokens_used_today.toLocaleString()} tokens
+                              {(acc.token_limit_per_day ?? 0) > 0 && (
+                                <span className="text-zinc-600"> / {(acc.token_limit_per_day ?? 0).toLocaleString()} limit</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {testResult && testResult.id === acc.id && (
+                            <span
+                              className={`text-[11px] font-medium flex items-center gap-1 ${
+                                testResult.ok ? "text-emerald-400" : "text-red-400"
+                              }`}
+                            >
+                              {testResult.ok ? (
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              ) : (
+                                <XCircle className="w-3.5 h-3.5" />
+                              )}
+                              {testResult.msg}
+                            </span>
+                          )}
+
+                          <button
+                            onClick={() => handleTest(acc.id)}
+                            disabled={testingId === acc.id}
+                            className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors"
+                          >
+                            {testingId === acc.id ? "Testing..." : "Test Key"}
+                          </button>
+
+                          <button
+                            onClick={() => startEdit(acc)}
+                            className="p-1.5 rounded-lg hover:bg-blue-950/40 text-zinc-500 hover:text-blue-400 transition-colors"
+                            title="Edit Akun"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            onClick={() => handleDelete(acc.id)}
+                            className="p-1.5 rounded-lg hover:bg-red-950/40 text-zinc-500 hover:text-red-400 transition-colors"
+                            title="Remove Account"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )
                   )}
-
-                  <button
-                    onClick={() => handleTest(acc.id)}
-                    disabled={testingId === acc.id}
-                    className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors"
-                  >
-                    {testingId === acc.id ? "Testing..." : "Test Key"}
-                  </button>
-
-                  <button
-                    onClick={() => handleDelete(acc.id)}
-                    className="p-1.5 rounded-lg hover:bg-red-950/40 text-zinc-500 hover:text-red-400 transition-colors"
-                    title="Remove Account"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 </div>
               </div>
             ))}
@@ -375,7 +633,7 @@ export const ModelAccountManager: React.FC = () => {
         )}
       </div>
 
-      {/* Model Catalog / Available Models in Dropdown */}
+      {/* ── Model Catalog ── */}
       <div className="pt-4 border-t border-zinc-800">
         <div className="flex items-center justify-between mb-3">
           <h4 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
@@ -385,7 +643,10 @@ export const ModelAccountManager: React.FC = () => {
         </div>
 
         {/* Quick Add Custom Model Form */}
-        <form onSubmit={handleAddCustomModel} className="p-3 rounded-lg bg-zinc-950 border border-zinc-800/80 mb-4 flex flex-wrap items-center gap-2 text-xs">
+        <form
+          onSubmit={handleAddCustomModel}
+          className="p-3 rounded-lg bg-zinc-950 border border-zinc-800/80 mb-4 flex flex-wrap items-center gap-2 text-xs"
+        >
           <input
             type="text"
             placeholder="Model ID (e.g. gpt-4o, claude-3-5-sonnet, deepseek-r1)"

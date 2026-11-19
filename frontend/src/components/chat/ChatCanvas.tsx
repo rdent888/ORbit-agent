@@ -5,6 +5,7 @@ import { ThinkingIndicator } from "./ThinkingIndicator";
 import { ToolCallCard } from "./ToolCallCard";
 import { CheckpointBanner } from "./CheckpointBanner";
 import { ModelSelector } from "./ModelSelector";
+import { TokenMonitorBadge } from "./TokenMonitorBadge";
 import { ChatInput } from "./ChatInput";
 import {
   Sparkles,
@@ -40,37 +41,34 @@ export const ChatCanvas: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#0a0d14] overflow-hidden">
-      {/* Top Navbar */}
-      <div className="h-14 border-b border-zinc-800/80 px-4 flex items-center justify-between shrink-0 bg-zinc-950/60 backdrop-blur">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xs font-semibold text-zinc-100 truncate max-w-[140px]">
+      {/* Top Navbar — Row 1: Title + Layout toggle + Settings gear */}
+      <div className="h-10 border-b border-zinc-800/60 px-3 flex items-center justify-between shrink-0 bg-zinc-950/80 backdrop-blur">
+        {/* Left: Conversation title + status */}
+        <div className="flex items-center gap-2 min-w-0">
+          <h2 className="text-xs font-semibold text-zinc-100 truncate max-w-[180px]">
             {activeConv?.title || "New Task"}
           </h2>
-          <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800/50">
+          <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800/50 shrink-0">
             {activeConv?.status || "Ready"}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Layout Mode Selector (Split IDE vs Full Chat vs Full Editor) */}
-          <div className="flex items-center border border-zinc-800 rounded-lg p-0.5 bg-zinc-900 text-xs">
+        {/* Right: Layout toggle + Settings */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center border border-zinc-800 rounded-lg p-0.5 bg-zinc-900">
             <button
               onClick={() => setLayoutMode("split")}
-              className={`p-1.5 rounded-md transition-colors flex items-center gap-1 ${
-                layoutMode === "split"
-                  ? "bg-zinc-800 text-indigo-400 font-semibold"
-                  : "text-zinc-400 hover:text-zinc-200"
+              className={`p-1.5 rounded-md transition-colors ${
+                layoutMode === "split" ? "bg-zinc-800 text-indigo-400" : "text-zinc-500 hover:text-zinc-200"
               }`}
-              title="Split View (Chat Kiri + Editor Kanan)"
+              title="Split View (Chat + Editor)"
             >
               <Columns2 className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setLayoutMode("chat-full")}
-              className={`p-1.5 rounded-md transition-colors flex items-center gap-1 ${
-                layoutMode === "chat-full"
-                  ? "bg-zinc-800 text-blue-400 font-semibold"
-                  : "text-zinc-400 hover:text-zinc-200"
+              className={`p-1.5 rounded-md transition-colors ${
+                layoutMode === "chat-full" ? "bg-zinc-800 text-blue-400" : "text-zinc-500 hover:text-zinc-200"
               }`}
               title="Full Chat"
             >
@@ -78,31 +76,34 @@ export const ChatCanvas: React.FC = () => {
             </button>
             <button
               onClick={() => setLayoutMode("editor-full")}
-              className={`p-1.5 rounded-md transition-colors flex items-center gap-1 ${
-                layoutMode === "editor-full"
-                  ? "bg-zinc-800 text-emerald-400 font-semibold"
-                  : "text-zinc-400 hover:text-zinc-200"
+              className={`p-1.5 rounded-md transition-colors ${
+                layoutMode === "editor-full" ? "bg-zinc-800 text-emerald-400" : "text-zinc-500 hover:text-zinc-200"
               }`}
-              title="Full Editor & File Viewer"
+              title="Full Editor"
             >
               <Code2 className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <ModelSelector />
-
-          {/* Settings Toggle */}
           <button
             onClick={() => setAuxTab(auxTab === "settings" ? "none" : "settings")}
             className={`p-1.5 border border-zinc-800 rounded-lg transition-colors ${
               auxTab === "settings"
-                ? "bg-zinc-800 text-blue-400"
-                : "bg-zinc-900 text-zinc-400 hover:text-zinc-200"
+                ? "bg-zinc-800 text-blue-400 border-blue-700/50"
+                : "bg-zinc-900 text-zinc-500 hover:text-zinc-200"
             }`}
             title="Model Accounts & Settings"
           >
             <Settings className="w-4 h-4" />
           </button>
+        </div>
+      </div>
+
+      {/* Top Navbar — Row 2: Model selector + Token monitor */}
+      <div className="h-10 border-b border-zinc-800/80 px-3 flex items-center gap-2 shrink-0 bg-zinc-950/60 backdrop-blur">
+        <ModelSelector />
+        <div className="ml-auto shrink-0">
+          <TokenMonitorBadge />
         </div>
       </div>
 

@@ -216,14 +216,36 @@ async def send_message(conv_id: str, body: MessageCreate, db: Session = Depends(
 
     # Save user message
     message_content = body.content
+    
+    # Handle /goal command: set conversation goal
+    if message_content.strip().startswith("/goal"):
+        goal_text = message_content.strip()[5:].strip()
+        if goal_text:
+            conv.goal = goal_text
+            conv.updated_at = datetime.datetime.utcnow().isoformat()
+            db.commit()
+
     if body.attachments:
+        import base64
+        uploads_dir = pathlib.Path(__file__).parent.parent / "data" / "uploads"
+        uploads_dir.mkdir(parents=True, exist_ok=True)
         att_text = []
         for att in body.attachments:
             name = att.get("name", "file")
             att_type = att.get("type", "")
             data_url = att.get("data_url", "")
             if "image" in att_type and data_url:
-                att_text.append(f"![{name}]({data_url})")
+                try:
+                    header, b64data = data_url.split(",", 1) if "," in data_url else ("", data_url)
+                    img_bytes = base64.b64decode(b64data)
+                    safe_name = "".join(c for c in name if c.isalnum() or c in "._-") or "upload.png"
+                    timestamp = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+                    saved_file = uploads_dir / f"{timestamp}_{safe_name}"
+                    saved_file.write_bytes(img_bytes)
+                    rel_path = str(saved_file).replace("\\", "/")
+                    att_text.append(f"### [Lampiran Gambar: {name}]\n- Lokasi File: `{rel_path}`\n- Ukuran: {len(img_bytes)} bytes\n*(Gambar tersimpan di disk lokal untuk mencegah pemborosan token)*")
+                except Exception as ex:
+                    att_text.append(f"[Lampiran Gambar: {name} (Gagal disimpan: {ex})]")
             elif att.get("text_content"):
                 att_text.append(f"### Lampiran File: {name}\n```\n{att['text_content'][:1500]}\n```")
         if att_text:
@@ -573,6 +595,40 @@ def delete_account(account_id: str, db: Session = Depends(get_db)):
     db.commit()
     return {"ok": True}
 
+class AccountUpdate(BaseModel):
+    account_label: str | None = None
+    api_key: str | None = None
+    base_url: str | None = None
+    priority: int | None = None
+    token_limit_per_day: int | None = None
+    is_active: int | None = None
+
+@app.patch("/api/model-accounts/{account_id}")
+def update_account(account_id: str, body: AccountUpdate, db: Session = Depends(get_db)):
+    a = db.query(ModelAccount).filter_by(id=account_id).first()
+    if not a:
+        raise HTTPException(404, "Account not found")
+    if body.account_label is not None:
+        a.account_label = body.account_label.strip()
+    if body.api_key:
+        a.api_key_encrypted = encrypt(body.api_key.strip())
+    if body.base_url is not None:
+        a.base_url = body.base_url.strip() or None
+    if body.priority is not None:
+        a.priority = body.priority
+    if body.token_limit_per_day is not None:
+        a.token_limit_per_day = body.token_limit_per_day
+    if body.is_active is not None:
+        a.is_active = body.is_active
+    db.commit()
+    return {
+        "ok": True,
+        "id": a.id,
+        "account_label": a.account_label,
+        "priority": a.priority,
+        "token_limit_per_day": a.token_limit_per_day
+    }
+
 @app.post("/api/model-accounts/{account_id}/test")
 async def test_account(account_id: str, db: Session = Depends(get_db)):
     a = db.query(ModelAccount).filter_by(id=account_id).first()
@@ -621,6 +677,141 @@ async def test_account(account_id: str, db: Session = Depends(get_db)):
         return {"ok": False, "error": str(e)}
 
 # ══════════════════════════════════════════════════════════════════════════════
+# MODEL MONITOR (Real-time Token Usage & Availability)
+# ══════════════════════════════════════════════════════════════════════════════
+@app.get("/api/model-accounts/monitor")
+def monitor_accounts(db: Session = Depends(get_db)):
+    """Real-time token usage, limit, and availability status per account."""
+    accounts = db.query(ModelAccount).order_by(ModelAccount.provider, ModelAccount.priority).all()
+    result = []
+    for a in accounts:
+        # check over limit
+        over = a.token_limit_per_day > 0 and a.tokens_used_today >= a.token_limit_per_day
+        pct_used = (a.tokens_used_today / a.token_limit_per_day * 100) if a.token_limit_per_day > 0 else 0
+        # current usable state
+        usable = not over  # True if account can be used
+        result.append({
+            "id": a.id,
+            "provider": a.provider,
+            "account_label": a.account_label,
+            "is_active": a.is_active,
+            "priority": a.priority,
+            "token_limit_per_day": a.token_limit_per_day,
+            "tokens_used_today": a.tokens_used_today,
+            "last_used_at": a.last_used_at,
+            "pct_used": round(pct_used, 1),
+            "over_limit": over,
+            "usable": usable,
+            "enabled_models": db.query(ModelConfig).filter_by(provider=a.provider, is_enabled=1).count(),
+            "total_models": db.query(ModelConfig).filter_by(provider=a.provider).count(),
+        })
+    return result
+
+@app.get("/api/model-configs/monitor")
+def monitor_configs(db: Session = Depends(get_db)):
+    """Real-time model availability with token usage context."""
+    configs = db.query(ModelConfig).filter_by(is_enabled=1).order_by(ModelConfig.sort_order).all()
+    result = []
+    for c in configs:
+        # check duplicate against account
+        has_account = db.query(ModelAccount).filter_by(provider=c.provider, is_active=1).count() > 0
+        result.append({
+            "id": c.id,
+            "display_name": c.display_name,
+            "provider": c.provider,
+            "model_id": c.model_id,
+            "context_window": c.context_window,
+            "is_enabled": True,
+            "sort_order": c.sort_order,
+            "has_active_account": has_account,
+            "usable": has_account,
+        })
+    # also include disabled configs
+    disabled_cfgs = db.query(ModelConfig).filter_by(is_enabled=0).order_by(ModelConfig.sort_order).all()
+    for c in disabled_cfgs:
+        result.append({
+            "id": c.id,
+            "display_name": c.display_name,
+            "provider": c.provider,
+            "model_id": c.model_id,
+            "context_window": c.context_window,
+            "is_enabled": False,
+            "sort_order": c.sort_order,
+            "has_active_account": False,
+            "usable": False,
+        })
+    return result
+
+@app.get("/api/monitor/realtime")
+def monitor_realtime(db: Session = Depends(get_db)):
+    """Comprehensive real-time token limits & model availability monitoring."""
+    accounts = db.query(ModelAccount).order_by(ModelAccount.provider, ModelAccount.priority).all()
+    accounts_data = []
+    total_tokens_today = 0
+    
+    for a in accounts:
+        today = datetime.datetime.utcnow().date().isoformat()
+        if a.last_reset_at and a.last_reset_at[:10] != today:
+            a.tokens_used_today = 0
+            a.last_reset_at = datetime.datetime.utcnow().isoformat()
+            db.commit()
+
+        used = a.tokens_used_today or 0
+        total_tokens_today += used
+        limit = a.token_limit_per_day or 0
+        over = limit > 0 and used >= limit
+        pct = round((used / limit * 100), 1) if limit > 0 else 0
+        
+        status = "exhausted" if over else ("warning" if pct >= 85 else "healthy")
+        if not a.is_active:
+            status = "inactive"
+
+        accounts_data.append({
+            "id": a.id,
+            "provider": a.provider,
+            "account_label": a.account_label,
+            "is_active": bool(a.is_active),
+            "priority": a.priority,
+            "tokens_used_today": used,
+            "token_limit_per_day": limit,
+            "pct_used": pct,
+            "status": status,
+            "last_used_at": a.last_used_at,
+        })
+
+    active_providers = {a.provider for a in accounts if a.is_active and (a.token_limit_per_day == 0 or a.tokens_used_today < a.token_limit_per_day)}
+    active_providers.add("hermes")
+
+    configs = db.query(ModelConfig).filter_by(is_enabled=1).order_by(ModelConfig.sort_order).all()
+    models_data = []
+    for c in configs:
+        is_avail = c.provider == "auto" or c.provider in active_providers or c.provider in ("bansosai", "custom")
+        models_data.append({
+            "id": c.id,
+            "display_name": c.display_name,
+            "provider": c.provider,
+            "model_id": c.model_id,
+            "context_window": c.context_window,
+            "is_available": is_avail,
+            "status": "online" if is_avail else "offline",
+        })
+
+    online_count = sum(1 for m in models_data if m["is_available"] and m["id"] != "auto")
+    total_count = len([m for m in models_data if m["id"] != "auto"])
+
+    return {
+        "summary": {
+            "total_models": total_count,
+            "online_models": online_count,
+            "total_tokens_today": total_tokens_today,
+            "active_accounts": len([a for a in accounts_data if a["is_active"]]),
+            "timestamp": datetime.datetime.utcnow().isoformat(),
+        },
+        "accounts": accounts_data,
+        "models": models_data,
+    }
+
+# ══════════════════════════════════════════════════════════════════════════════
 # MODEL CONFIGS
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/api/model-configs")
@@ -648,24 +839,42 @@ async def fetch_provider_models(body: FetchModelsBody, db: Session = Depends(get
             data = r.json()
             model_items = data.get("data", [])
             imported = []
+            skipped = []
             for item in model_items:
                 m_id = item.get("id")
-                if not m_id: continue
-                cfg_id = f"mc-{body.provider_label}-{m_id.replace('/', '-')}"
-                existing = db.query(ModelConfig).filter_by(id=cfg_id).first()
-                if not existing:
-                    new_mc = ModelConfig(
-                        id=cfg_id,
-                        display_name=f"{m_id} ({body.provider_label})",
-                        provider=body.provider_label,
-                        model_id=m_id,
-                        context_window=128000,
-                        sort_order=40,
-                    )
-                    db.add(new_mc)
-                    imported.append(m_id)
+                if not m_id:
+                    continue
+                # Normalize cfg_id from full model_id (dots and slashes → dash)
+                safe_id = m_id.replace("/", "-").replace(".", "-").lower()
+                cfg_id = f"mc-{body.provider_label}-{safe_id}"
+                # Double-guard: check both by id AND by (model_id, provider)
+                existing_by_id = db.query(ModelConfig).filter_by(id=cfg_id).first()
+                existing_by_model = (
+                    db.query(ModelConfig)
+                    .filter_by(model_id=m_id, provider=body.provider_label)
+                    .first()
+                )
+                if existing_by_id or existing_by_model:
+                    skipped.append(m_id)
+                    continue
+                new_mc = ModelConfig(
+                    id=cfg_id,
+                    display_name=f"{m_id} ({body.provider_label})",
+                    provider=body.provider_label,
+                    model_id=m_id,
+                    context_window=128000,
+                    sort_order=40,
+                )
+                db.add(new_mc)
+                imported.append(m_id)
             db.commit()
-            return {"ok": True, "imported_count": len(imported), "models": imported}
+            return {
+                "ok": True,
+                "imported_count": len(imported),
+                "skipped_count": len(skipped),
+                "models": imported,
+                "skipped": skipped,
+            }
     except HTTPException:
         raise
     except Exception as e:

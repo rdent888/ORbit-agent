@@ -20,13 +20,21 @@ from services.task_analyzer import analyze_task_complexity
 HERMES_BIN = r"C:\Users\rdent\AppData\Local\hermes\bin\hermes.exe"
 
 def _build_hermes_context_prompt(messages: list[dict]) -> str:
-    """Format full multi-turn conversation memory into Hermes prompt so it retains full context."""
+    """
+    Build Hermes prompt from the messages list.
+    
+    The messages list is already optimized by get_messages_with_memory():
+    - For short conversations: full raw history
+    - For long conversations: compressed memory context + last N raw messages
+    
+    This function formats that into a single readable prompt for Hermes CLI.
+    """
     if not messages:
         return "Hello"
 
     system_instructions = ""
-    history_lines = []
-    current_prompt = ""
+    memory_context = ""
+    conversation_lines = []
 
     for m in messages:
         role = m.get("role", "")
@@ -35,51 +43,78 @@ def _build_hermes_context_prompt(messages: list[dict]) -> str:
             continue
 
         if role == "system":
-            # Extract high-level goal or primary guidance
             if "PRIMARY GOAL:" in content:
-                goal_part = content.split("PRIMARY GOAL:")[-1].strip()
-                system_instructions = f"Primary Goal: {goal_part}"
+                goal_part = content.split("PRIMARY GOAL:")[-1].strip().split("\n")[0]
+                system_instructions = f"Goal Utama: {goal_part}"
         elif role == "user":
-            history_lines.append(f"User: {content}")
+            # Detect injected memory context block
+            if content.startswith("[Konteks Memory dari Percakapan Sebelumnya"):
+                # Extract the memory block content
+                memory_context = content.split("HANYA UNTUK REFERENSI]:\n\n", 1)[-1] if "HANYA UNTUK REFERENSI]:" in content else ""
+            else:
+                conversation_lines.append(f"User: {content}")
         elif role == "assistant":
-            history_lines.append(f"Assistant: {content}")
+            # Skip the synthetic "Understood" acknowledgment for memory injection
+            if content.startswith("Understood. Saya sudah membaca"):
+                continue
+            conversation_lines.append(f"Assistant: {content}")
 
-    if not history_lines:
+    if not conversation_lines:
         return messages[-1].get("content", "Hello")
 
-    # If only 1 user turn, pass as is
-    if len(history_lines) == 1 and history_lines[0].startswith("User: "):
-        current_prompt = history_lines[0][6:]
+    # Single user turn — pass as direct prompt
+    if len(conversation_lines) == 1 and conversation_lines[0].startswith("User: ") and not memory_context:
+        prompt = conversation_lines[0][6:]
         if system_instructions:
-            return f"[Instruction: {system_instructions}]\n\n{current_prompt}"
-        return current_prompt
+            return f"[{system_instructions}]\n\n{prompt}"
+        return prompt
 
-    # Multi-turn memory: format dialogue history + current user message
-    # Take last up to 12 messages to keep prompt focused and within Hermes token budget
-    trimmed_history = history_lines[-12:]
-    earlier_turns = trimmed_history[:-1]
-    latest_turn = trimmed_history[-1]
-
-    # Extract clean user query from latest turn if present
+    # Multi-turn or memory-augmented: build structured context prompt
+    # Extract the latest user message
+    latest_turn = conversation_lines[-1]
     latest_content = latest_turn[6:] if latest_turn.startswith("User: ") else latest_turn
+    earlier_turns = conversation_lines[:-1]
 
     parts = []
+
+    # System instruction yang tegas agar Hermes menyadari dirinya memiliki ingatan/memory percakapan
+    parts.append(
+        "Kamu adalah Hermes Agent di Orbit Agent IDE. "
+        "Kamu MEMILIKI dan MEMAHAMI seluruh riwayat percakapan yang ada di bawah ini. "
+        "Jangan pernah katakan kamu tidak memiliki konteks atau baru mulai percakapan baru jika riwayat di bawah ini tersedia. "
+        "Gunakan informasi di riwayat percakapan ini untuk menjawab pertanyaan pengguna dengan akurat.\n\n"
+        "PEDOMAN FORMAT JAWABAN (WAJIB DIIKUTI):\n"
+        "- Berikan jawaban terstruktur rapi seperti AI modern (Gemini/Claude).\n"
+        "- Gunakan heading Markdown (## dan ###) untuk membagi bagian utama.\n"
+        "- Gunakan bullet points (-) atau penomoran (1, 2, 3) untuk daftar poin.\n"
+        "- Pisahkan setiap paragraf, heading, dan daftar poin dengan baris baru ganda (blank line) agar mudah dibaca.\n"
+        "- Tebalkan (**teks**) kata kunci penting."
+    )
+
+    # 1. Goal
     if system_instructions:
-        parts.append(f"--- [PANDUAN & GOAL UTAMA] ---\n{system_instructions}\n")
+        parts.append(f"--- [GOAL UTAMA] ---\n{system_instructions}")
 
-    parts.append("--- [RIWAYAT PERCAKAPAN SEBELUMNYA DALAM ROOM INI] ---")
-    for turn in earlier_turns:
-        parts.append(turn)
-    parts.append("--- [AKHIR RIWAYAT PERCAKAPAN] ---\n")
+    # 2. Compressed memory (if available)
+    if memory_context:
+        parts.append(f"--- [MEMORY KONTEKS PERCAKAPAN INI] ---\n{memory_context}")
 
-    parts.append(f"--- [PESAN TERKINI DARI USER - JAWAB DENGAN MEMPERHATIKAN RIWAYAT DI ATAS] ---\nUser: {latest_content}")
+    # 3. Recent conversation turns
+    if earlier_turns:
+        parts.append("--- [RIWAYAT PERCAKAPAN SEBELUMNYA DI ROOM INI] ---")
+        for turn in earlier_turns[-8:]:
+            parts.append(turn)
+        parts.append("--- [AKHIR RIWAYAT PERCAKAPAN] ---")
+
+    # 4. Current user request
+    parts.append(f"User: {latest_content}")
 
     return "\n\n".join(parts)
 
-def _start_hermes_stream_json(prompt_file_path: str):
-    """Start Hermes with --query-file and --format stream-json for clean JSONL token streaming with full memory."""
+def _start_hermes_process(prompt_file_path: str):
+    """Start Hermes in quiet mode (-Q) which preserves clean Markdown spacing, blank lines, and headings."""
     return subprocess.Popen(
-        [HERMES_BIN, "chat", "--query-file", prompt_file_path, "--format", "stream-json"],
+        [HERMES_BIN, "chat", "--query-file", prompt_file_path, "-Q"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -88,7 +123,7 @@ def _start_hermes_stream_json(prompt_file_path: str):
     )
 
 async def _stream_hermes(messages: list[dict]) -> AsyncIterator[str]:
-    """Execute local Hermes Agent and stream clean Markdown output using stream-json format with memory context."""
+    """Execute local Hermes Agent and stream beautifully formatted Markdown output matching Gemini/Claude styling."""
     if not os.path.exists(HERMES_BIN):
         yield "\n[Error: Hermes binary not found at C:\\Users\\rdent\\AppData\\Local\\hermes\\bin\\hermes.exe]"
         return
@@ -102,23 +137,28 @@ async def _stream_hermes(messages: list[dict]) -> AsyncIterator[str]:
             tf.write(full_context_prompt)
             temp_file = tf.name
 
-        proc = await asyncio.to_thread(_start_hermes_stream_json, temp_file)
+        proc = await asyncio.to_thread(_start_hermes_process, temp_file)
+
+        started = False
+        ansi_escape = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\([B0]')
 
         while True:
             line = await asyncio.to_thread(proc.stdout.readline)
             if not line:
                 break
-            line = line.strip()
-            if not line:
+
+            # Skip hermes session markers/footers if present
+            if line.startswith("session_id:") or line.startswith("Session:"):
                 continue
-            try:
-                event = json.loads(line)
-                if event.get("type") == "text":
-                    text = event.get("text", "")
-                    if text:
-                        yield text
-            except json.JSONDecodeError:
-                pass
+            if "Resume this session with:" in line:
+                break
+
+            # Clean any ANSI codes that might bleed through
+            clean_line = ansi_escape.sub('', line)
+            clean_line = re.sub(r'38;2;\d+;\d+;\d+m?', '', clean_line)
+
+            # Yield line preserving the exact newline characters from -Q
+            yield clean_line
 
         try:
             proc.kill()

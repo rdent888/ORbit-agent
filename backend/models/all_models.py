@@ -51,6 +51,8 @@ class Conversation(Base):
     title           = Column(String, nullable=False, default="New Conversation")
     model_config_id = Column(String, ForeignKey("model_configs.id", ondelete="SET NULL"))
     goal            = Column(Text)
+    memory_summary  = Column(Text)          # Compressed memory: JSON with goal, completed, current_state, key_decisions, pending
+    memory_turn_count = Column(Integer, nullable=False, default=0)  # Last message count when memory was updated
     status          = Column(String, nullable=False, default="active")
     token_count     = Column(Integer, nullable=False, default=0)
     is_pinned       = Column(Integer, nullable=False, default=0)

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from models.all_models import Conversation, Message, ToolCall, Checkpoint, Setting, Project
 from services.litellm_router import stream_completion, resolve_model_for_task
+from services.memory_compressor import compress_memory, get_messages_with_memory
 import tools.read_file as tool_read_file
 import tools.write_file as tool_write_file
 import tools.edit_file as tool_edit_file
@@ -116,7 +117,7 @@ async def run_agent(
     exec_policy = _get_setting(db, "tool_execution_policy", "request-review")
     checkpoint_threshold = _get_setting(db, "checkpoint_threshold", 0.75)
 
-    messages = _build_messages(conv, db)
+    messages = get_messages_with_memory(conv, db)
 
     # Resolve model dynamically (supports Auto Smart Router or User Manual selection)
     latest_prompt = messages[-1]["content"] if messages else ""
@@ -151,25 +152,27 @@ ACTIVE PROJECT WORKSPACE: {workspace_path}
 {skills_catalog}
 
 ## CRITICAL RULES — YOU MUST FOLLOW THESE:
-1. ALWAYS USE TOOLS for any file, code search, folder, or terminal operations. NEVER just show code — EXECUTE immediately.
-2. When searching for code or text in the project → use `grep_search`.
-3. When searching for files by name or pattern (*.tsx, *.py) → use `file_search`.
-4. When inspecting recent code changes → use `git_diff`.
-5. When user asks to CREATE a file → use `write_file` RIGHT NOW.
-6. When user asks to EDIT an existing file → use `edit_file` (target/replacement) or `write_file`.
-7. When user asks to DELETE a file/folder → use `delete_file` RIGHT NOW.
-8. When user asks to RUN a shell/cmd command → use `run_command` RIGHT NOW.
-9. When creating architecture reports, diagrams, or plans → use `create_artifact`.
-10. When user gives a GitHub link or asks to install a skill/plugin → use `install_skill` RIGHT NOW.
-11. When user provides a local path to import an existing skill → use `import_local_skill` RIGHT NOW.
-12. When user asks about or wants to apply an installed skill → use `read_skill` to read its instructions first!
-13. When user asks to create a new custom skill → use `create_skill`.
-14. When delegating a focused sub-task → use `invoke_subagent`.
-15. When searching external documentation/web → use `search_web`.
-16. When needing clarifying choices from user → use `ask_question`.
-17. Relative paths are resolved relative to workspace: {workspace_path}
-18. Chain multiple tools in sequence to complete complex tasks autonomously.
-19. When user mentions @hermes, asks for Hermes review, or wants to delegate autonomous task execution to local Hermes Agent → use `invoke_hermes` RIGHT NOW.
+1. YOU ARE EQUIPPED WITH REAL OPERATING SYSTEM TOOLS. Even if native function calling is not exposed by your API provider, Orbit Agent parses text blocks formatted with ```tool_call. When you write a ```tool_call block, Orbit Agent will IMMEDIATELY execute it on the host machine and return the result.
+2. YOU CAN AND MUST EXECUTE TOOLS DIRECTLY. NEVER refuse or say "I don't have access" or "I cannot run tools". You DO have access: just write the ```tool_call block!
+3. ALWAYS USE TOOLS for any file, code search, folder, or terminal operations. NEVER just show code or ask user to run commands — YOU EXECUTE THEM immediately.
+4. When searching for code or text in the project → use `grep_search`.
+5. When searching for files by name or pattern (*.tsx, *.py) → use `file_search`.
+6. When inspecting recent code changes → use `git_diff`.
+7. When user asks to CREATE a file → use `write_file` RIGHT NOW.
+8. When user asks to EDIT an existing file → use `edit_file` (target/replacement) or `write_file`.
+9. When user asks to DELETE a file/folder → use `delete_file` RIGHT NOW.
+10. When user asks to RUN a shell/cmd command → use `run_command` RIGHT NOW.
+11. When creating architecture reports, diagrams, or plans → use `create_artifact`.
+12. When user gives a GitHub link or asks to install a skill/plugin → use `install_skill` RIGHT NOW.
+13. When user provides a local path to import an existing skill → use `import_local_skill` RIGHT NOW.
+14. When user asks about or wants to apply an installed skill → use `read_skill` to read its instructions first!
+15. When user asks to create a new custom skill → use `create_skill`.
+16. When delegating a focused sub-task → use `invoke_subagent`.
+17. When searching external documentation/web → use `search_web`.
+18. When needing clarifying choices from user → use `ask_question`.
+19. Relative paths are resolved relative to workspace: {workspace_path}
+20. Chain multiple tools in sequence to complete complex tasks autonomously.
+21. When user mentions @hermes, asks for Hermes review, or wants to delegate autonomous task execution to local Hermes Agent → use `invoke_hermes` RIGHT NOW.
 
 ## AVAILABLE TOOLS:
 {tool_names}
@@ -278,6 +281,13 @@ ACTIVE PROJECT WORKSPACE: {workspace_path}
             conv.status = "completed"
             conv.updated_at = datetime.datetime.utcnow().isoformat()
             db.commit()
+
+            # Trigger memory compression (rule-based, zero LLM cost)
+            try:
+                compress_memory(conv, db)
+            except Exception:
+                pass  # Non-critical — don't break the response flow
+
             break
 
         # Execute tool calls
@@ -337,21 +347,61 @@ ACTIVE PROJECT WORKSPACE: {workspace_path}
             db.commit()
             messages.append({"role": "user", "content": f"[System Tool Result for '{tool_name}']:\n{str(result)}"})
 
+def _safe_json_loads(text: str) -> dict | None:
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    # Fix unescaped backslashes in Windows file paths
+    try:
+        fixed = re.sub(r'([A-Za-z]):\\', r'\1:/', text)
+        fixed = fixed.replace('\\', '/')
+        return json.loads(fixed)
+    except Exception:
+        pass
+    return None
+
 def _extract_tool_calls(text: str) -> list[dict]:
     """
     Parse tool calls from assistant response.
-    Format agent should output:
-    ```tool_call
-    {"tool": "read_file", "args": {"path": "/foo/bar.py"}}
-    ```
+    Supports:
+    1. Standard ```tool_call ... ``` or ```json ... ``` blocks
+    2. Bare JSON tool blocks like {"tool": "...", "args": {...}} (e.g. from Hermes or non-markdown models)
     """
     import re
-    pattern = r"```tool_call\s*\n(.*?)\n```"
-    matches = re.findall(pattern, text, re.DOTALL)
     result = []
+
+    # 1. Look for ```tool_call ... ``` or ```json ... ``` blocks
+    pattern = r"```(?:tool_call|json)?\s*\n(.*?)\n```"
+    matches = re.findall(pattern, text, re.DOTALL)
     for m in matches:
-        try:
-            result.append(json.loads(m.strip()))
-        except json.JSONDecodeError:
-            pass
+        obj = _safe_json_loads(m)
+        if isinstance(obj, dict) and "tool" in obj:
+            result.append(obj)
+    if result:
+        return result
+
+    # 2. Look for bare JSON objects containing "tool" and "args" (e.g. from Hermes)
+    lines = text.split("\n")
+    current_json = ""
+    in_json = False
+    brace_count = 0
+
+    for line in lines:
+        stripped = line.strip()
+        if '{"tool"' in stripped or '{\n  "tool"' in stripped or ('"tool"' in stripped and "{" in stripped):
+            in_json = True
+            current_json = ""
+            brace_count = 0
+        if in_json:
+            current_json += line + "\n"
+            brace_count += line.count("{") - line.count("}")
+            if brace_count == 0 and current_json.strip():
+                obj = _safe_json_loads(current_json)
+                if isinstance(obj, dict) and "tool" in obj:
+                    result.append(obj)
+                in_json = False
+                current_json = ""
+
     return result
