@@ -1,119 +1,171 @@
-# 🪐 Orbit Agent (Autonomous Coding IDE)
+# 🪐 ORbit Agent — Autonomous Coding IDE
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![React](https://img.shields.io/badge/Frontend-React_18_%2B_Vite-61dafb.svg)](https://react.dev/)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
+[![LiteLLM](https://img.shields.io/badge/Routing-LiteLLM-blueviolet.svg)](https://litellm.ai/)
 [![Local Engine](https://img.shields.io/badge/Local_AI-Nous_Hermes-orange.svg)](https://nousresearch.com/)
 
-**Orbit Agent** adalah autonomous coding assistant & development environment yang dirancang khusus untuk berjalan **100% lokal** di mesin PC Anda dengan fleksibilitas model AI tanpa batas (Cloud AI + Local AI Engine).
+**ORbit Agent** adalah autonomous coding assistant & development environment yang dirancang untuk berjalan **100% lokal** di PC Anda — dengan dukungan multi-akun, multi-provider AI, token rotation otomatis, dan split-view IDE terintegrasi.
 
 ---
 
-## 🌟 Fitur Utama & Keunggulan
+## 🌟 Fitur Utama
 
-### 1. 🪐 Dual-Engine Intelligence (Cloud AI + Hermes Local PC)
-- **Cloud Models:** Google Gemini 3.5 Flash, Claude Sonnet 4.5, OpenAI GPT-4o, DeepSeek, bansosAI.
-- **Local PC Engine:** Terintegrasi langsung dengan **Nous Hermes Agent** lokal (Zero Cloud Cost & Private).
-- **Auto Fallback & Smart Task Router:** Ketika kuota cloud habis atau terkena rate-limit (`429`), sistem otomatis berotasi atau beralih ke Hermes Agent lokal.
+### 1. 🤖 Multi-Provider AI dengan Token Pool & Auto-Fallback
+- Dukung **Google Gemini**, **bansosAI Proxy**, **Anthropic Claude**, **OpenAI**, **OpenRouter**, **Ollama**, dan **custom OpenAI-compatible proxy**.
+- Daftarkan **banyak akun per provider** (misal 3 akun Google AI Studio, 3 akun bansosAI) — sistem otomatis berotasi ke akun berikutnya saat rate-limit `429` tercapai.
+- **Priority system:** Akun priority `0` = utama, `1` = cadangan, `2+` = fallback. Bisa diedit kapan saja.
+- **Auto-priority slot:** Saat tambah akun baru, slot priority diisi otomatis ke angka berikutnya (tidak perlu hitung manual).
 
-### 2. 🎛️ Resizable Split-View IDE & Unified Design
-- **Pembatas Fleksibel yang Bisa Digeser:** Lebar Sidebar dan porsi antara Chat Canvas vs Editor/Terminal dapat disesuaikan sesuka hati dengan resizer halus dan tactile grip.
-- **Header Horizon 56px:** Desain proporsional dan selaras, dengan tinggi header rata di seluruh aplikasi.
-- **Dark Obsidian Theme:** Skema warna gelap yang nyaman di mata untuk sesi ngoding panjang.
+### 2. 🧠 Smart Task Router (Auto Model Switching)
+- Mode **Auto** memilih model terbaik sesuai kompleksitas task secara otomatis.
+- **Hermes Local Engine:** Integrasi langsung dengan Nous Hermes Agent yang berjalan di PC lokal — Zero Cloud Cost & 100% Private.
+- Ketika semua akun cloud kena rate-limit, sistem fallback ke Hermes tanpa interupsi.
 
-### 3. ⚡ Turbo Mode (Full Local Device Access)
-- **Direct Hardware & OS Access:** Agent dapat membaca, menulis, membuat berkas, dan menjalankan perintah langsung di local environment Windows Anda.
-- **Action Approval Control:** Dalam mode normal, setiap eksekusi tool berisiko meminta persetujuan (*Allow / Deny*). Saat **Turbo Mode** aktif, approval dilewati untuk kecepatan maksimal.
+### 3. 📊 Real-Time Token & Model Monitor
+- Badge monitor di navbar menampilkan: jumlah model aktif, token terpakai hari ini, dan status kesehatan tiap akun secara live.
+- Panel detail memperlihatkan progress bar kuota per akun, ketersediaan tiap model, dan bisa digunakan langsung sebagai model picker.
+- Auto-refresh tiap 12 detik.
 
-### 4. 💾 Checkpoint & Cross-Model Resume Progress
-- **Auto-Checkpoint:** Snapshot percakapan otomatis dibuat saat mendekati limit token atau kendala jaringan.
-- **Ganti Model di Tengah Jalan:** Lanjutkan task yang terhenti dengan model AI lain tanpa kehilangan konteks maupun progress.
+### 4. ⚙️ Model Settings & Accounts Panel
+- **Tambah akun** dari antarmuka UI — isi provider, label, API key, priority, dan batas token harian.
+- **Edit inline** per akun: ubah label, priority, batas token, atau ganti API key tanpa hapus-daftar ulang.
+- **Quick priority ▲▼**: Naikkan/turunkan urutan akun satu langkah langsung dari kartu akun.
+- **Ambil model otomatis**: Fetch daftar model yang tersedia dari provider (bansosAI, custom proxy) — sistem cerdas mencegah duplikat.
+- **Tambah model manual**: Daftarkan Model ID kustom (GPT-4o, DeepSeek, model Gemini terbaru) langsung dari UI.
 
-### 5. 🖥️ Integrated Terminal & Code Viewer
-- Terminal PowerShell terintegrasi via WebSocket berkecepatan tinggi.
-- Tab editor file dengan fitur simpan langsung ke disk lokal, salin konten, dan unduh berkas.
+### 5. 🖥️ Resizable Split-View IDE
+- **Split mode:** Chat kiri + Editor/Terminal kanan, lebar bisa digeser bebas.
+- **Full Chat / Full Editor:** Tombol toggle layout di navbar.
+- **Integrated Terminal:** PowerShell via WebSocket real-time.
+- **Code Viewer:** Tab editor file dengan simpan ke disk, salin, dan unduh.
 
-### 6. ⚡ Slash Commands & Quick Actions
-- `/hermes` — Delegasikan task langsung ke Hermes Autonomous Agent lokal.
-- `/plan` — Rancang rencana eksekusi terstruktur sebelum mulai eksekusi.
-- `/goal` — Kunci target utama sesi agar AI tetap fokus.
-- `/terminal` — Buka konsol terminal interaktif.
-- `/checkpoint` — Snapshot manual progres kerja.
+### 6. 💾 Checkpoint & Cross-Model Resume
+- Auto-snapshot percakapan mendekati batas token atau gangguan jaringan.
+- Lanjutkan task yang terhenti dengan model berbeda tanpa kehilangan konteks.
+
+### 7. ⚡ Slash Commands
+| Command | Fungsi |
+|---|---|
+| `/hermes` | Delegasikan task ke Hermes Autonomous Agent lokal |
+| `/plan` | Rancang rencana eksekusi terstruktur |
+| `/goal` | Kunci target utama sesi |
+| `/terminal` | Buka konsol terminal interaktif |
+| `/checkpoint` | Snapshot manual progres |
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Frontend:** React 18, Vite, TypeScript, TailwindCSS, Zustand, Lucide Icons, `@xterm/xterm`
-- **Backend:** Python 3.12, FastAPI, WebSocket, SQLAlchemy, SQLite (WAL mode)
-- **AI Routing:** LiteLLM (multi-provider abstraction) & Fernet cryptography
+| Layer | Teknologi |
+|---|---|
+| **Frontend** | React 18, Vite, TypeScript, TailwindCSS, Zustand, Lucide Icons, `@xterm/xterm` |
+| **Backend** | Python 3.12, FastAPI, WebSocket, SQLAlchemy, SQLite (WAL mode) |
+| **AI Routing** | LiteLLM (multi-provider abstraction) |
+| **Security** | Fernet symmetric encryption untuk API key di database |
+| **Local AI** | Nous Hermes Agent (OpenAI-compatible local server) |
 
 ---
 
-## 🚀 Panduan Instalasi & Menjalankan (Untuk User Baru)
+## 🚀 Instalasi & Menjalankan
 
-### 📋 Prasyarat Sistem
-Sebelum menginstal, pastikan komputer sudah terpasang:
-1. **Python 3.10+** (Centang *"Add Python to PATH"* saat instal)
-2. **Node.js (v18+)**
-3. **Git**
-
----
-
-### Cara 1: Setup Otomatis 1-Klik (Rekomendasi untuk Windows)
-
-1. Clone repositori ini:
-   ```bash
-   git clone https://github.com/rdent888/ORbit-agent.git
-   cd ORbit-agent
-   ```
-2. Cukup klik ganda (double-click) file:
-   ```cmd
-   install.bat
-   ```
-   *Script ini otomatis membuat virtual environment Python, menginstall dependensi backend & frontend, dan menyiapkan environment.*
-3. Setelah selesai, jalankan aplikasi kapan saja dengan double-click:
-   ```cmd
-   start.bat
-   ```
-   *Aplikasi akan otomatis menyalakan backend, frontend, dan membuka browser di `http://localhost:5173`.*
+### Prasyarat
+Pastikan sudah terinstal:
+- **Python 3.10+** (centang *"Add Python to PATH"* saat instalasi)
+- **Node.js v18+**
+- **Git**
 
 ---
 
-### Cara 2: Instalasi Manual lewat Terminal
+### ✅ Cara 1: Setup Otomatis (Rekomendasi Windows)
 
-1. **Clone & Masuk ke Folder Proyek:**
-   ```bash
-   git clone https://github.com/rdent888/ORbit-agent.git
-   cd ORbit-agent
-   ```
+```bash
+git clone https://github.com/rdent888/ORbit-agent.git
+cd ORbit-agent
+```
 
-2. **Setup Backend (Python):**
-   ```bash
-   cd backend
-   python -m venv venv
-   # Aktifkan virtual environment (Windows):
-   venv\Scripts\activate
-   # (atau di Linux/Mac: source venv/bin/activate)
+Double-click **`install.bat`** — otomatis membuat virtual environment, install semua dependensi backend & frontend.
 
-   pip install -r requirements.txt
-   uvicorn main:app --host 127.0.0.1 --port 8000 --reload
-   ```
+Setelah selesai, jalankan kapan saja dengan double-click **`start.bat`** → backend, frontend, dan browser terbuka otomatis di `http://localhost:5173`.
 
-3. **Setup Frontend (React + Vite):**
-   Buka terminal baru di folder utama proyek:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
+---
 
-4. Buka browser di **`http://localhost:5173`**.
-5. Buka menu **Model Accounts & Keys** (pojok kiri bawah) untuk menambahkan API Key favorit Anda (Google Gemini, Claude, OpenAI, atau Hermes Local Engine).
+### Cara 2: Manual via Terminal
+
+```bash
+# 1. Clone
+git clone https://github.com/rdent888/ORbit-agent.git
+cd ORbit-agent
+
+# 2. Backend
+cd backend
+python -m venv venv
+venv\Scripts\activate          # Windows
+# source venv/bin/activate     # Linux/Mac
+pip install -r requirements.txt
+uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+
+# 3. Frontend (terminal baru)
+cd frontend
+npm install
+npm run dev
+```
+
+Buka **`http://localhost:5173`** di browser.
+
+---
+
+## 🔑 Menambahkan API Key
+
+1. Klik ikon **⚙️ Settings** di pojok kanan atas navbar.
+2. Di panel **Model Settings & Accounts**, isi form:
+   - **Provider** → pilih Google Gemini, bansosAI, Claude, dll.
+   - **Label** → nama bebas untuk akun ini
+   - **API Key** → paste key dari provider
+   - **Prioritas** → otomatis diisi slot berikutnya (bisa diubah)
+3. Klik **Simpan ke Pool Akun**.
+
+> Untuk Google AI Studio: dapatkan API key gratis di [aistudio.google.com/apikey](https://aistudio.google.com/apikey). Tidak perlu isi Base URL.
+>
+> Untuk bansosAI: Base URL otomatis diisi `https://api.bansosai.app/v1`. Gunakan tombol **Ambil Model dari Provider** setelah simpan akun pertama.
+
+---
+
+## 🗂️ Struktur Direktori
+
+```
+ORbit-Agent/
+├── backend/
+│   ├── main.py                  # FastAPI app, semua endpoint REST & WebSocket
+│   ├── models/all_models.py     # SQLAlchemy ORM models
+│   ├── services/
+│   │   ├── agent.py             # Autonomous agent loop & tool execution
+│   │   └── litellm_router.py    # Multi-provider routing & account pool
+│   └── tools/                   # Tool definitions (run_command, file_ops, dll)
+├── frontend/
+│   └── src/
+│       ├── App.tsx              # Layout root (sidebar + chat + editor + aux pane)
+│       ├── components/
+│       │   ├── chat/
+│       │   │   ├── ChatCanvas.tsx       # Navbar 2-baris + area chat
+│       │   │   ├── ModelSelector.tsx    # Dropdown model picker dengan search & tabs
+│       │   │   └── TokenMonitorBadge.tsx # Real-time token & model monitor
+│       │   ├── settings/
+│       │   │   └── ModelAccountManager.tsx  # Panel kelola akun & model
+│       │   └── auxiliary/
+│       │       └── AuxiliaryPane.tsx    # Settings drawer
+│       └── stores/chatStore.ts  # Zustand global state
+├── data/
+│   └── agy_local.db             # SQLite database (auto-created)
+├── install.bat                  # One-click installer (Windows)
+├── start.bat                    # One-click launcher (Windows)
+└── CONTEXT byOrbit.md           # Handoff document untuk AI session
+```
 
 ---
 
 ## 📄 Lisensi
 
-Proyek ini dilisensikan di bawah lisensi **Apache 2.0** — lihat file [LICENSE](LICENSE) untuk detail lengkap.
+Proyek ini dilisensikan di bawah **Apache 2.0** — lihat file [LICENSE](LICENSE) untuk detail.  
 Hak Cipta © 2026 rdent888.
